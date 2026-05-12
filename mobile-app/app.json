@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "REDA INVEST GAME",
+    "slug": "reda-invest-game",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "redainvestgame",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.redainvest.game",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#080b10"
+      }
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "يسمح REDA INVEST GAME باختيار صورة لإثبات إنجاز المهام."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://10.0.2.2:5000/api"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+.npm-cache/
+.chrome-layout-test*/
+.env
+dist/
+dist-mobile-check/
+.expo-local/
+.expo/
+.DS_Store
+npm-debug.log*
+coverage/
