@@ -12,7 +12,7 @@ const MAX_MESSAGES = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const UPLOAD_PUBLIC_BASE = '/uploads/portal-chat';
-const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads', 'portal-chat');
+const UPLOAD_ROOT = path.resolve(__dirname, '..', '..', 'uploads', 'portal-chat');
 const MEDIA_TYPES = {
   'image/jpeg': 'image',
   'image/png': 'image',
@@ -250,6 +250,13 @@ const uploadPortalMedia = asyncHandler(async (req, res) => {
     throw new Error('حجم الفيديو كبير جداً، الحد الأقصى هو 100MB.');
   }
 
+  console.log('[portal-chat upload] stored file:', {
+    destination: req.file.destination,
+    path: req.file.path,
+    filename: req.file.filename,
+    publicUrl: `${UPLOAD_PUBLIC_BASE}/${req.file.filename}`,
+  });
+
   res.status(201).json({
     success: true,
     media: {
@@ -366,8 +373,15 @@ const resetPortalCoins = asyncHandler(async (req, res) => {
     throw new Error('إعادة ضبط الكوينات متاحة للأدمن فقط');
   }
 
+  const nextBalance = req.body?.coinBalance === undefined ? DEFAULT_COIN_BALANCE : Number(req.body.coinBalance);
+
+  if (!Number.isFinite(nextBalance) || nextBalance < 0) {
+    res.status(400);
+    throw new Error('أدخل رصيد كوينات صحيح وغير سالب');
+  }
+
   const room = await getSharedRoom();
-  room.coinBalance = DEFAULT_COIN_BALANCE;
+  room.coinBalance = nextBalance;
   room.rewardHistory = [];
   await room.save();
 

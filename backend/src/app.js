@@ -18,6 +18,7 @@ const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
+const uploadsStaticRoot = path.resolve(__dirname, '..', 'uploads');
 
 app.use(
   cors({
@@ -26,7 +27,8 @@ app.use(
   })
 );
 app.use(express.json({ limit: '6mb' }));
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(uploadsStaticRoot));
+console.log(`[uploads] static root: ${uploadsStaticRoot}`);
 
 app.get('/', (req, res) => {
   res.send('API is running 🚀');

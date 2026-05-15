@@ -492,7 +492,7 @@ const AdminConsole = ({
         </button>
         <button className="portal-ghost-button" type="button" onClick={onResetCoins} disabled={resettingCoins}>
           <RotateCcw size={18} />
-          <span>إعادة ضبط الكوينات</span>
+          <span>إعادة تهيئة اليوزر</span>
         </button>
         <button className="portal-danger-button" type="button" onClick={onClearMessages} disabled={clearing}>
           <Trash2 size={18} />
@@ -651,6 +651,52 @@ const RewardModal = ({ target, amount, error, saving, onAmountChange, onClose, o
   );
 };
 
+const UserResetModal = ({ balance, error, saving, onBalanceChange, onClose, onConfirm }) => (
+  <div className="portal-modal" role="dialog" aria-modal="true" aria-label="إعادة تهيئة اليوزر" onClick={onClose}>
+    <form className="portal-modal-panel portal-reset-modal" onSubmit={onConfirm} onClick={(event) => event.stopPropagation()}>
+      <button className="portal-modal-close" type="button" onClick={onClose} aria-label="إغلاق">
+        <X size={20} />
+      </button>
+
+      <div className="portal-modal-heading">
+        <RotateCcw size={22} />
+        <div>
+          <span>إعدادات اليوزر</span>
+          <h3>إعادة تهيئة اليوزر</h3>
+        </div>
+      </div>
+
+      <p className="portal-modal-copy">
+        سيتم تعيين رصيد جديد وحذف سجل مكافآت الإعجابات فقط. الرسائل الحالية ستبقى كما هي.
+      </p>
+
+      <label className="portal-reward-field">
+        <span>رصيد البداية الجديد</span>
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={balance}
+          onChange={(event) => onBalanceChange(event.target.value)}
+          placeholder="مثال: 500"
+          autoFocus
+        />
+      </label>
+
+      {error ? <p className="portal-chat-error">{error}</p> : null}
+
+      <div className="portal-modal-actions">
+        <button className="portal-ghost-button" type="button" onClick={onClose} disabled={saving}>
+          إلغاء
+        </button>
+        <button className="portal-primary-button" type="submit" disabled={saving}>
+          {saving ? 'جاري التهيئة...' : 'تأكيد التهيئة'}
+        </button>
+      </div>
+    </form>
+  </div>
+);
+
 const ProjectSuspended = () => {
   const [session, setSession] = useState(readPortalSession);
   const [code, setCode] = useState('');
@@ -672,7 +718,10 @@ const ProjectSuspended = () => {
   const [rewardAmount, setRewardAmount] = useState('');
   const [rewardError, setRewardError] = useState('');
   const [rewarding, setRewarding] = useState(false);
-  const [resettingCoins, setResettingCoins] = useState(false);
+  const [userResetOpen, setUserResetOpen] = useState(false);
+  const [userResetBalance, setUserResetBalance] = useState(String(DEFAULT_COIN_BALANCE));
+  const [userResetError, setUserResetError] = useState('');
+  const [resettingUser, setResettingUser] = useState(false);
   const endRef = useRef(null);
 
   const chatUrl = useCallback(() => {
@@ -905,23 +954,38 @@ const ProjectSuspended = () => {
     }
   };
 
-  const handleResetCoins = async () => {
-    const confirmed = window.confirm('هل أنت متأكد أنك تريد إعادة ضبط رصيد الكوينات إلى 500؟');
+  const openUserResetModal = () => {
+    setUserResetBalance(String(coinBalance));
+    setUserResetError('');
+    setUserResetOpen(true);
+  };
 
-    if (!confirmed || session?.mode !== 'admin') {
+  const handleConfirmUserReset = async (event) => {
+    event.preventDefault();
+
+    if (session?.mode !== 'admin') {
       return;
     }
 
-    setResettingCoins(true);
+    const nextBalance = Number(userResetBalance);
+
+    if (String(userResetBalance).trim() === '' || !Number.isFinite(nextBalance) || nextBalance < 0) {
+      setUserResetError('أدخل رصيد كوينات صحيح وغير سالب.');
+      return;
+    }
+
+    setResettingUser(true);
+    setUserResetError('');
 
     try {
-      const { data } = await api.post('/portal-chat/coins/reset', { code: session.code });
+      const { data } = await api.post('/portal-chat/coins/reset', { code: session.code, coinBalance: nextBalance });
       applyRoomData(data);
+      setUserResetOpen(false);
       setChatError('');
     } catch (requestError) {
-      setChatError(requestError.message || 'تعذر إعادة ضبط الكوينات.');
+      setUserResetError(requestError.message || 'تعذر إعادة تهيئة اليوزر.');
     } finally {
-      setResettingCoins(false);
+      setResettingUser(false);
     }
   };
 
@@ -933,6 +997,8 @@ const ProjectSuspended = () => {
     setActiveMedia(null);
     setCoinDetailsOpen(false);
     setRewardTarget(null);
+    setUserResetOpen(false);
+    setUserResetError('');
     setRewardHistory([]);
     setCoinBalance(DEFAULT_COIN_BALANCE);
     setChatError('');
@@ -1013,8 +1079,8 @@ const ProjectSuspended = () => {
           onClearMessages={handleClearMessages}
           onLogout={handleLogout}
           onRefresh={() => fetchMessages()}
-          onResetCoins={handleResetCoins}
-          resettingCoins={resettingCoins}
+          onResetCoins={openUserResetModal}
+          resettingCoins={resettingUser}
           endRef={endRef}
         />
         <RewardModal
@@ -1026,6 +1092,16 @@ const ProjectSuspended = () => {
           onClose={() => setRewardTarget(null)}
           onConfirm={handleConfirmReward}
         />
+        {userResetOpen ? (
+          <UserResetModal
+            balance={userResetBalance}
+            error={userResetError}
+            saving={resettingUser}
+            onBalanceChange={setUserResetBalance}
+            onClose={() => setUserResetOpen(false)}
+            onConfirm={handleConfirmUserReset}
+          />
+        ) : null}
         <MediaLightbox media={activeMedia} onClose={() => setActiveMedia(null)} />
       </PortalFrame>
     );

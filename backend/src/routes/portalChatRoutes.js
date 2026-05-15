@@ -14,12 +14,14 @@ const {
 } = require('../controllers/portalChatController');
 
 const router = express.Router();
-const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'portal-chat');
+const uploadDir = path.resolve(__dirname, '..', '..', 'uploads', 'portal-chat');
 
 fs.mkdirSync(uploadDir, { recursive: true });
+console.log(`[portal-chat upload] directory ready: ${uploadDir}`);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    console.log(`[portal-chat upload] destination path: ${uploadDir}`);
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {

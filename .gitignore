@@ -2,6 +2,7 @@ node_modules
 .env
 dist
 build
+backend/uploads/
 .DS_Store
 .chrome-layout-test-direct/
 .chrome-layout-test/
