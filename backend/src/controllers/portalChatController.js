@@ -2,6 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const asyncHandler = require('../utils/asyncHandler');
 const PortalChat = require('../models/PortalChat');
+const User = require('../models/User');
 
 const ROOM_KEY = 'main';
 const USER_CODE = 'الشتا كتصب';
@@ -388,6 +389,58 @@ const resetPortalCoins = asyncHandler(async (req, res) => {
   sendRoom(res, room);
 });
 
+const transferPortalCoinsToUser = asyncHandler(async (req, res) => {
+  const sender = getPortalRole(req);
+
+  if (sender !== 'user') {
+    res.status(403);
+    throw new Error('تحويل الكوينات متاح للمستخدم فقط');
+  }
+
+  const targetUser = await User.findOne({ username: 'imane' });
+
+  if (!targetUser) {
+    res.status(404);
+    throw new Error('تعذر العثور على الحساب');
+  }
+
+  await getSharedRoom();
+
+  const roomBeforeTransfer = await PortalChat.findOneAndUpdate(
+    { roomKey: ROOM_KEY, coinBalance: { $gt: 0 } },
+    { $set: { coinBalance: 0 } },
+    { new: false }
+  );
+
+  if (!roomBeforeTransfer) {
+    const room = await getSharedRoom();
+    sendRoom(res, room);
+    return;
+  }
+
+  const transferredCoins = Math.max(0, Number(roomBeforeTransfer.coinBalance || 0));
+
+  if (transferredCoins > 0) {
+    try {
+      const updateResult = await User.updateOne({ _id: targetUser._id }, { $inc: { coins: transferredCoins } });
+
+      if (updateResult.matchedCount !== 1) {
+        await PortalChat.updateOne({ roomKey: ROOM_KEY }, { $inc: { coinBalance: transferredCoins } });
+        res.status(404);
+        throw new Error('تعذر العثور على الحساب');
+      }
+    } catch (error) {
+      if (!res.statusCode || res.statusCode < 400) {
+        await PortalChat.updateOne({ roomKey: ROOM_KEY }, { $inc: { coinBalance: transferredCoins } });
+      }
+      throw error;
+    }
+  }
+
+  const room = await getSharedRoom();
+  sendRoom(res, room);
+});
+
 const clearPortalMessages = asyncHandler(async (req, res) => {
   const sender = getPortalRole(req);
 
@@ -412,5 +465,6 @@ module.exports = {
   markAdminMessagesRead,
   rewardPortalMedia,
   resetPortalCoins,
+  transferPortalCoinsToUser,
   clearPortalMessages,
 };

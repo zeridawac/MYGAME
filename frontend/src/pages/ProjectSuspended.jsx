@@ -167,6 +167,13 @@ const EntryChoice = ({ onOpenPortal, onEnterSite }) => (
   </section>
 );
 
+const PortalBackButton = ({ onClick }) => (
+  <button className="portal-back-button" type="button" onClick={onClick}>
+    <span aria-hidden="true">←</span>
+    <span>رجوع</span>
+  </button>
+);
+
 const AccessGate = ({ code, error, errorKey, onCodeChange, onSubmit }) => (
   <section className="portal-gate" aria-label="بوابة التواصل المشفر">
     <div className="portal-seal">
@@ -676,7 +683,15 @@ const AdminConsole = ({
   </section>
 );
 
-const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
+const CoinDetailsModal = ({
+  coinBalance,
+  rewards,
+  transferringCoins,
+  transferMessage,
+  transferError,
+  onTransferCoins,
+  onClose,
+}) => {
   const [withdrawMessageVisible, setWithdrawMessageVisible] = useState(false);
   const totalEarned = rewards.reduce((sum, reward) => sum + Number(reward.coins || 0), 0);
 
@@ -742,6 +757,18 @@ const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
         {withdrawMessageVisible ? (
           <p className="portal-profit-message">سيتم فتح السحب فور فتح الموقع</p>
         ) : null}
+
+        <button
+          className="portal-ghost-button portal-transfer-button"
+          type="button"
+          onClick={onTransferCoins}
+          disabled={transferringCoins || Number(coinBalance || 0) <= 0}
+        >
+          {transferringCoins ? 'جاري التحويل...' : 'حول الكوينات إلى حسابك'}
+        </button>
+
+        {transferMessage ? <p className="portal-transfer-message">{transferMessage}</p> : null}
+        {transferError ? <p className="portal-transfer-error">{transferError}</p> : null}
       </div>
     </div>
   );
@@ -861,6 +888,9 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
   const [coinBalance, setCoinBalance] = useState(DEFAULT_COIN_BALANCE);
   const [rewardHistory, setRewardHistory] = useState([]);
   const [coinDetailsOpen, setCoinDetailsOpen] = useState(false);
+  const [transferringCoins, setTransferringCoins] = useState(false);
+  const [coinTransferMessage, setCoinTransferMessage] = useState('');
+  const [coinTransferError, setCoinTransferError] = useState('');
   const [rewardTarget, setRewardTarget] = useState(null);
   const [rewardAmount, setRewardAmount] = useState('');
   const [rewardError, setRewardError] = useState('');
@@ -1218,6 +1248,50 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
     }
   };
 
+  const handleTransferCoins = async () => {
+    if (session?.mode !== 'user' || transferringCoins || Number(coinBalance || 0) <= 0) {
+      return;
+    }
+
+    setTransferringCoins(true);
+    setCoinTransferMessage('');
+    setCoinTransferError('');
+
+    try {
+      const { data } = await api.post('/portal-chat/coins/transfer', { code: session.code });
+      applyRoomData(data);
+      setCoinTransferMessage('تم تحويل الكوينات إلى حسابك بنجاح');
+      setChatError('');
+    } catch (requestError) {
+      setCoinTransferError(requestError.message || 'تعذر تحويل الكوينات.');
+    } finally {
+      setTransferringCoins(false);
+    }
+  };
+
+  const handleBackToChoice = () => {
+    saveSession(null);
+    setEntryMode('choice');
+    setCode('');
+    setError('');
+    setMessages([]);
+    setDraft('');
+    clearSelectedMedia();
+    setActiveMedia(null);
+    setCoinDetailsOpen(false);
+    setRewardTarget(null);
+    setUserResetOpen(false);
+    setUserResetError('');
+    setUploadFiles([]);
+    setUploadsError('');
+    setRewardHistory([]);
+    setCoinBalance(DEFAULT_COIN_BALANCE);
+    setTransferringCoins(false);
+    setCoinTransferMessage('');
+    setCoinTransferError('');
+    setChatError('');
+  };
+
   const handleLogout = () => {
     saveSession(null);
     setEntryMode('choice');
@@ -1233,6 +1307,9 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
     setUploadsError('');
     setRewardHistory([]);
     setCoinBalance(DEFAULT_COIN_BALANCE);
+    setTransferringCoins(false);
+    setCoinTransferMessage('');
+    setCoinTransferError('');
     setChatError('');
   };
 
@@ -1270,6 +1347,7 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
   if (session?.mode === 'user') {
     return (
       <PortalFrame mode="chat">
+        <PortalBackButton onClick={handleBackToChoice} />
         <UserChat
           messages={messages}
           draft={draft}
@@ -1283,13 +1361,25 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
           onMediaChange={handleMediaChange}
           onClearMedia={clearSelectedMedia}
           onOpenMedia={setActiveMedia}
-          onShowCoinDetails={() => setCoinDetailsOpen(true)}
+          onShowCoinDetails={() => {
+            setCoinTransferMessage('');
+            setCoinTransferError('');
+            setCoinDetailsOpen(true);
+          }}
           onSend={handleSend}
           onLogout={handleLogout}
           endRef={endRef}
         />
         {coinDetailsOpen ? (
-          <CoinDetailsModal coinBalance={coinBalance} rewards={rewardHistory} onClose={() => setCoinDetailsOpen(false)} />
+          <CoinDetailsModal
+            coinBalance={coinBalance}
+            rewards={rewardHistory}
+            transferringCoins={transferringCoins}
+            transferMessage={coinTransferMessage}
+            transferError={coinTransferError}
+            onTransferCoins={handleTransferCoins}
+            onClose={() => setCoinDetailsOpen(false)}
+          />
         ) : null}
         <MediaLightbox media={activeMedia} onClose={() => setActiveMedia(null)} />
       </PortalFrame>
@@ -1299,6 +1389,7 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
   if (session?.mode === 'admin') {
     return (
       <PortalFrame mode="admin">
+        <PortalBackButton onClick={handleBackToChoice} />
         <AdminConsole
           messages={messages}
           draft={draft}
@@ -1365,6 +1456,7 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
 
   return (
     <PortalFrame>
+      <PortalBackButton onClick={handleBackToChoice} />
       <AccessGate code={code} error={error} errorKey={errorKey} onCodeChange={setCode} onSubmit={handleUnlock} />
     </PortalFrame>
   );

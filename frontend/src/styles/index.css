@@ -653,6 +653,39 @@ textarea::placeholder {
   color: var(--portal-gold);
 }
 
+.portal-back-button {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  z-index: 35;
+  min-height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0 0.7rem;
+  border: 1px solid rgba(66, 245, 215, 0.2);
+  border-radius: 999px;
+  color: #d9fff8;
+  background: rgba(5, 17, 27, 0.68);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  font-size: 0.82rem;
+  font-weight: 900;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.portal-back-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(66, 245, 215, 0.42);
+  background: rgba(8, 24, 36, 0.82);
+}
+
 .portal-seal,
 .portal-admin-badge,
 .portal-admin-chip {
@@ -1671,6 +1704,38 @@ textarea::placeholder {
   animation: portalFadeUp 220ms ease both;
 }
 
+.portal-transfer-button {
+  width: 100%;
+  margin-top: 0.15rem;
+  border-color: rgba(66, 245, 215, 0.24);
+  color: #d9fff8;
+  background:
+    linear-gradient(135deg, rgba(66, 245, 215, 0.09), rgba(255, 255, 255, 0.045)),
+    rgba(255, 255, 255, 0.04);
+}
+
+.portal-transfer-message,
+.portal-transfer-error {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--portal-radius);
+  line-height: 1.7;
+  text-align: center;
+  animation: portalFadeUp 220ms ease both;
+}
+
+.portal-transfer-message {
+  border: 1px solid rgba(108, 255, 183, 0.24);
+  color: #d9ffeb;
+  background: rgba(108, 255, 183, 0.08);
+}
+
+.portal-transfer-error {
+  border: 1px solid rgba(255, 107, 139, 0.28);
+  color: #ffd6df;
+  background: rgba(255, 107, 139, 0.09);
+}
+
 .portal-reward-field {
   display: grid;
   gap: 0.45rem;
@@ -2131,6 +2196,14 @@ textarea::placeholder {
     font-size: 1rem;
   }
 
+  .portal-back-button {
+    top: max(0.6rem, env(safe-area-inset-top));
+    right: max(0.6rem, env(safe-area-inset-right));
+    min-height: 2.2rem;
+    padding: 0 0.62rem;
+    font-size: 0.78rem;
+  }
+
   .portal-copy h1 {
     font-size: clamp(2rem, 11vw, 3.35rem);
     line-height: 1.16;
@@ -2383,16 +2456,49 @@ textarea::placeholder {
   .portal-message,
   .portal-error,
   .portal-media-menu,
-  .portal-profit-message {
+  .portal-profit-message,
+  .portal-transfer-message,
+  .portal-transfer-error {
     animation: none;
   }
 }
 
 .auth-screen {
+  position: relative;
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 1.25rem;
+}
+
+.auth-choice-back {
+  position: fixed;
+  top: max(0.85rem, env(safe-area-inset-top));
+  right: max(0.85rem, env(safe-area-inset-right));
+  z-index: 10;
+  min-height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: 1px solid rgba(62, 226, 197, 0.22);
+  border-radius: 999px;
+  color: #d9fff8;
+  background: rgba(8, 14, 22, 0.72);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px);
+  font-size: 0.82rem;
+  font-weight: 900;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.auth-choice-back:hover {
+  transform: translateY(-1px);
+  border-color: rgba(62, 226, 197, 0.42);
+  background: rgba(12, 22, 32, 0.86);
 }
 
 .auth-panel {
@@ -3643,6 +3749,18 @@ th {
 }
 
 @media (max-width: 620px) {
+  .auth-screen {
+    padding-top: 3.6rem;
+  }
+
+  .auth-choice-back {
+    top: max(0.6rem, env(safe-area-inset-top));
+    right: max(0.6rem, env(safe-area-inset-right));
+    min-height: 2.2rem;
+    padding: 0 0.62rem;
+    font-size: 0.78rem;
+  }
+
   .auth-panel {
     padding: 1.25rem;
   }

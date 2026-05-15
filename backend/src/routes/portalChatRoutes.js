@@ -10,6 +10,7 @@ const {
   markAdminMessagesRead,
   resetPortalCoins,
   rewardPortalMedia,
+  transferPortalCoinsToUser,
   uploadPortalMedia,
 } = require('../controllers/portalChatController');
 
@@ -79,6 +80,7 @@ router.post('/uploads', handleUpload, uploadPortalMedia);
 router.post('/read', markAdminMessagesRead);
 router.post('/rewards', rewardPortalMedia);
 router.post('/coins/reset', resetPortalCoins);
+router.post('/coins/transfer', transferPortalCoinsToUser);
 router.delete('/messages', clearPortalMessages);
 
 module.exports = router;

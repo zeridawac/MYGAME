@@ -32,6 +32,9 @@ const Register = () => {
 
   return (
     <main className="auth-screen">
+      <Link className="auth-choice-back" to="/">
+        ← رجوع
+      </Link>
       <section className="auth-panel">
         <div className="auth-brand">
           <span>دعوة خاصة</span>
