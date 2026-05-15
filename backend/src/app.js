@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -25,6 +26,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: '6mb' }));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.get('/', (req, res) => {
   res.send('API is running 🚀');

@@ -9,9 +9,33 @@ const portalMessageSchema = new mongoose.Schema(
     },
     text: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 2000,
+      default: '',
+    },
+    imageUrl: {
+      type: String,
+      default: '',
+    },
+    imageName: {
+      type: String,
+      default: '',
+    },
+    imageMime: {
+      type: String,
+      default: '',
+    },
+    imageSize: {
+      type: Number,
+      default: 0,
+    },
+    imagePath: {
+      type: String,
+      default: '',
+    },
+    readByUserAt: {
+      type: Date,
+      default: null,
     },
     createdAt: {
       type: Date,

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  CheckCheck,
+  ImagePlus,
   KeyRound,
   LockKeyhole,
   LogOut,
@@ -8,13 +10,17 @@ import {
   SendHorizonal,
   ShieldCheck,
   Trash2,
+  X,
 } from 'lucide-react';
 import api from '../api/config.js';
 
-const USER_CODE = 'الشتا كتصب';
+const USER_CODES = ['الشتا كتصب', 'شتا كتصب'];
 const ADMIN_CODE = 'admin';
 const SESSION_KEY = 'reda_secure_portal_session';
 const POLL_INTERVAL_MS = 1500;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_ORIGIN = API_URL.startsWith('http') ? API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '') : '';
 
 const safeJsonParse = (value, fallback) => {
   try {
@@ -24,15 +30,32 @@ const safeJsonParse = (value, fallback) => {
   }
 };
 
+const normalizeAnswer = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+const isUserCode = (value) => USER_CODES.includes(normalizeAnswer(value));
+const isAdminCode = (value) => normalizeAnswer(value).toLowerCase() === ADMIN_CODE;
+
+const getAssetUrl = (url) => {
+  if (!url) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  return API_ORIGIN ? `${API_ORIGIN}${url.startsWith('/') ? url : `/${url}`}` : url;
+};
+
 const readPortalSession = () => {
   if (typeof window === 'undefined') {
     return null;
   }
 
-  const session = safeJsonParse(window.localStorage.getItem(SESSION_KEY), null);
+  window.localStorage.removeItem(SESSION_KEY);
+  const session = safeJsonParse(window.sessionStorage.getItem(SESSION_KEY), null);
 
   if (!session?.mode || !session?.code) {
-    window.localStorage.removeItem(SESSION_KEY);
+    window.sessionStorage.removeItem(SESSION_KEY);
     return null;
   }
 
@@ -47,9 +70,9 @@ const formatTime = (value) => {
 };
 
 const makeSession = (answer) => {
-  const code = answer.trim();
+  const code = normalizeAnswer(answer);
   return {
-    mode: code.toLowerCase() === ADMIN_CODE ? 'admin' : 'user',
+    mode: isAdminCode(code) ? 'admin' : 'user',
     code,
   };
 };
@@ -118,6 +141,7 @@ const MessageBubble = ({ message, mode }) => {
   const isAdminMessage = message.sender === 'admin';
   const isMine = (mode === 'admin' && isAdminMessage) || (mode === 'user' && !isAdminMessage);
   const senderLabel = isMine ? 'أنت' : isAdminMessage ? 'الأدمن' : 'المستخدم';
+  const imageSrc = getAssetUrl(message.imageUrl);
 
   return (
     <article className={`portal-message ${isAdminMessage ? 'portal-message-admin' : 'portal-message-user'}`}>
@@ -125,23 +149,75 @@ const MessageBubble = ({ message, mode }) => {
         <span>{senderLabel}</span>
         <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
       </div>
-      <p>{message.text}</p>
+
+      {imageSrc ? (
+        <a className="portal-message-image-link" href={imageSrc} target="_blank" rel="noreferrer">
+          <img src={imageSrc} alt={message.imageName || 'صورة داخل الرسالة'} className="portal-message-image" />
+        </a>
+      ) : null}
+
+      {message.text ? <p>{message.text}</p> : null}
+
+      {mode === 'admin' && isAdminMessage && message.readByUserAt ? (
+        <div className="portal-read-receipt" title="قرأها المستخدم">
+          <CheckCheck size={15} />
+          <span>تمت القراءة</span>
+        </div>
+      ) : null}
     </article>
   );
 };
 
-const ChatComposer = ({ value, disabled, placeholder, onChange, onSubmit }) => (
+const ChatComposer = ({
+  value,
+  disabled,
+  placeholder,
+  selectedImage,
+  imagePreview,
+  onChange,
+  onImageChange,
+  onClearImage,
+  onSubmit,
+}) => (
   <form className="portal-composer" onSubmit={onSubmit}>
-    <input
-      type="text"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-      disabled={disabled}
-    />
-    <button type="submit" disabled={disabled || !value.trim()} aria-label="إرسال">
-      <SendHorizonal size={20} />
-    </button>
+    {imagePreview ? (
+      <div className="portal-image-preview">
+        <img src={imagePreview} alt="معاينة الصورة قبل الإرسال" />
+        <div>
+          <strong>{selectedImage?.name || 'صورة مرفقة'}</strong>
+          <span>سيتم إرسال الصورة داخل المحادثة</span>
+        </div>
+        <button type="button" onClick={onClearImage} aria-label="إزالة الصورة">
+          <X size={16} />
+        </button>
+      </div>
+    ) : null}
+
+    <div className="portal-composer-row">
+      <label className={`portal-attach-button ${disabled ? 'is-disabled' : ''}`} aria-label="إرفاق صورة">
+        <ImagePlus size={20} />
+        <input
+          type="file"
+          accept="image/*"
+          disabled={disabled}
+          onChange={(event) => {
+            onImageChange(event.target.files?.[0] || null);
+            event.target.value = '';
+          }}
+        />
+      </label>
+
+      <input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+      <button type="submit" disabled={disabled || (!value.trim() && !selectedImage)} aria-label="إرسال">
+        <SendHorizonal size={20} />
+      </button>
+    </div>
   </form>
 );
 
@@ -161,7 +237,21 @@ const ChatMessages = ({ messages, mode, loading, error, endRef }) => (
   </div>
 );
 
-const UserChat = ({ messages, draft, loading, error, sending, onDraftChange, onSend, onLogout, endRef }) => (
+const UserChat = ({
+  messages,
+  draft,
+  loading,
+  error,
+  sending,
+  selectedImage,
+  imagePreview,
+  onDraftChange,
+  onImageChange,
+  onClearImage,
+  onSend,
+  onLogout,
+  endRef,
+}) => (
   <section className="portal-chat-shell">
     <header className="portal-chat-header">
       <div>
@@ -182,6 +272,10 @@ const UserChat = ({ messages, draft, loading, error, sending, onDraftChange, onS
       onSubmit={onSend}
       placeholder="اكتب رسالتك للأدمن..."
       disabled={sending}
+      selectedImage={selectedImage}
+      imagePreview={imagePreview}
+      onImageChange={onImageChange}
+      onClearImage={onClearImage}
     />
   </section>
 );
@@ -193,7 +287,11 @@ const AdminConsole = ({
   error,
   sending,
   clearing,
+  selectedImage,
+  imagePreview,
   onDraftChange,
+  onImageChange,
+  onClearImage,
   onSend,
   onClearMessages,
   onLogout,
@@ -242,6 +340,10 @@ const AdminConsole = ({
           onSubmit={onSend}
           placeholder="اكتب رد الأدمن..."
           disabled={sending}
+          selectedImage={selectedImage}
+          imagePreview={imagePreview}
+          onImageChange={onImageChange}
+          onClearImage={onClearImage}
         />
       </div>
     </div>
@@ -257,6 +359,8 @@ const ProjectSuspended = () => {
   const [chatError, setChatError] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [draft, setDraft] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [sending, setSending] = useState(false);
   const [clearing, setClearing] = useState(false);
   const endRef = useRef(null);
@@ -269,12 +373,67 @@ const ProjectSuspended = () => {
     setSession(nextSession);
 
     if (nextSession) {
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
       return;
     }
 
-    window.localStorage.removeItem(SESSION_KEY);
+    window.sessionStorage.removeItem(SESSION_KEY);
   };
+
+  const clearSelectedImage = useCallback(() => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    setSelectedImage(null);
+    setImagePreview('');
+  }, [imagePreview]);
+
+  const handleImageChange = useCallback(
+    (file) => {
+      if (!file) {
+        clearSelectedImage();
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        setChatError('يمكن إرسال الصور فقط.');
+        return;
+      }
+
+      if (file.size > MAX_IMAGE_SIZE) {
+        setChatError('حجم الصورة يجب ألا يتجاوز 5MB.');
+        return;
+      }
+
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setChatError('');
+    },
+    [clearSelectedImage, imagePreview]
+  );
+
+  const markAdminMessagesRead = useCallback(
+    async (nextMessages) => {
+      if (session?.mode !== 'user') {
+        return;
+      }
+
+      const hasUnreadAdminMessage = nextMessages.some((message) => message.sender === 'admin' && !message.readByUserAt);
+
+      if (!hasUnreadAdminMessage) {
+        return;
+      }
+
+      const { data } = await api.post('/portal-chat/read', { code: session.code });
+      setMessages(data.messages || []);
+    },
+    [session?.code, session?.mode]
+  );
 
   const fetchMessages = useCallback(
     async ({ silent = false } = {}) => {
@@ -288,8 +447,10 @@ const ProjectSuspended = () => {
 
       try {
         const { data } = await api.get(chatUrl());
-        setMessages(data.messages || []);
+        const nextMessages = data.messages || [];
+        setMessages(nextMessages);
         setChatError('');
+        await markAdminMessagesRead(nextMessages);
       } catch (requestError) {
         setChatError(requestError.message || 'تعذر تحديث الرسائل. تأكد أن الخادم يعمل.');
       } finally {
@@ -298,14 +459,14 @@ const ProjectSuspended = () => {
         }
       }
     },
-    [chatUrl, session?.code]
+    [chatUrl, markAdminMessagesRead, session?.code]
   );
 
   const handleUnlock = (event) => {
     event.preventDefault();
-    const answer = code.trim();
+    const answer = normalizeAnswer(code);
 
-    if (answer === USER_CODE || answer.toLowerCase() === ADMIN_CODE) {
+    if (isUserCode(answer) || isAdminCode(answer)) {
       saveSession(makeSession(answer));
       setError('');
       setCode('');
@@ -317,20 +478,35 @@ const ProjectSuspended = () => {
     setErrorKey((current) => current + 1);
   };
 
+  const uploadSelectedImage = async () => {
+    if (!selectedImage) {
+      return null;
+    }
+
+    const formData = new FormData();
+    formData.append('code', session.code);
+    formData.append('image', selectedImage);
+
+    const { data } = await api.post('/portal-chat/uploads', formData);
+    return data.image;
+  };
+
   const handleSend = async (event) => {
     event.preventDefault();
     const text = draft.trim();
 
-    if (!text || !session?.code) {
+    if ((!text && !selectedImage) || !session?.code) {
       return;
     }
 
     setSending(true);
 
     try {
-      const { data } = await api.post('/portal-chat/messages', { text, code: session.code });
+      const image = await uploadSelectedImage();
+      const { data } = await api.post('/portal-chat/messages', { text, image, code: session.code });
       setMessages(data.messages || []);
       setDraft('');
+      clearSelectedImage();
       setChatError('');
     } catch (requestError) {
       setChatError(requestError.message || 'تعذر إرسال الرسالة.');
@@ -367,6 +543,7 @@ const ProjectSuspended = () => {
     saveSession(null);
     setMessages([]);
     setDraft('');
+    clearSelectedImage();
     setChatError('');
   };
 
@@ -387,6 +564,14 @@ const ProjectSuspended = () => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, session?.mode]);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
   if (session?.mode === 'user') {
     return (
       <PortalFrame mode="chat">
@@ -396,7 +581,11 @@ const ProjectSuspended = () => {
           loading={loadingMessages}
           error={chatError}
           sending={sending}
+          selectedImage={selectedImage}
+          imagePreview={imagePreview}
           onDraftChange={setDraft}
+          onImageChange={handleImageChange}
+          onClearImage={clearSelectedImage}
           onSend={handleSend}
           onLogout={handleLogout}
           endRef={endRef}
@@ -415,7 +604,11 @@ const ProjectSuspended = () => {
           error={chatError}
           sending={sending}
           clearing={clearing}
+          selectedImage={selectedImage}
+          imagePreview={imagePreview}
           onDraftChange={setDraft}
+          onImageChange={handleImageChange}
+          onClearImage={clearSelectedImage}
           onSend={handleSend}
           onClearMessages={handleClearMessages}
           onLogout={handleLogout}
