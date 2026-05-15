@@ -98,6 +98,317 @@ textarea::placeholder {
   color: var(--muted-2);
 }
 
+.suspension-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 1.125rem;
+  color: #f8fbff;
+  background:
+    radial-gradient(circle at 50% 16%, rgba(112, 167, 255, 0.18), transparent 34rem),
+    radial-gradient(circle at 18% 82%, rgba(62, 226, 197, 0.12), transparent 24rem),
+    linear-gradient(145deg, #05070d 0%, #0b111d 46%, #05070d 100%);
+  text-align: center;
+}
+
+.suspension-page::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  z-index: -3;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.12) 0 1px, transparent 1.5px) 0 0 / 3.8rem 3.8rem,
+    radial-gradient(circle, rgba(62, 226, 197, 0.12) 0 1px, transparent 1.5px) 1.7rem 2rem / 5.2rem 5.2rem;
+  opacity: 0.3;
+  animation: suspensionDrift 22s linear infinite;
+}
+
+.suspension-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 5.5rem 5.5rem;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 72%);
+}
+
+.suspension-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  width: 100%;
+  height: 3px;
+  transform-origin: left;
+  background: linear-gradient(90deg, transparent, var(--cyan), var(--gold), transparent);
+  box-shadow: 0 0 22px rgba(62, 226, 197, 0.55);
+  animation: suspensionLoad 1.15s ease forwards;
+}
+
+.suspension-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.suspension-glow,
+.suspension-orbit {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+}
+
+.suspension-glow {
+  filter: blur(18px);
+  opacity: 0.72;
+  animation: suspensionFloat 11s ease-in-out infinite alternate;
+}
+
+.suspension-glow-one {
+  width: clamp(12rem, 44vw, 26rem);
+  height: clamp(12rem, 44vw, 26rem);
+  top: 8%;
+  right: 8%;
+  background: rgba(62, 226, 197, 0.14);
+}
+
+.suspension-glow-two {
+  width: clamp(13rem, 48vw, 30rem);
+  height: clamp(13rem, 48vw, 30rem);
+  bottom: 3%;
+  left: 4%;
+  background: rgba(247, 201, 72, 0.12);
+  animation-delay: -4s;
+}
+
+.suspension-orbit {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 20px rgba(255, 255, 255, 0.03);
+  animation: suspensionPulse 7s ease-in-out infinite;
+}
+
+.suspension-orbit-one {
+  width: 9rem;
+  height: 9rem;
+  top: 16%;
+  left: 9%;
+}
+
+.suspension-orbit-two {
+  width: 5.25rem;
+  height: 5.25rem;
+  right: 14%;
+  bottom: 20%;
+  animation-delay: -2.5s;
+}
+
+.suspension-content {
+  width: min(58rem, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding: clamp(1.25rem, 5vw, 3rem) 0;
+  animation: suspensionFadeUp 850ms cubic-bezier(0.2, 0.85, 0.22, 1) both;
+}
+
+.suspension-kicker {
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: #bdeee4;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.suspension-content h1 {
+  max-width: 52rem;
+  margin: 0;
+  font-size: clamp(2.2rem, 11vw, 5.5rem);
+  line-height: 0.96;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-wrap: balance;
+  text-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+}
+
+.suspension-subtitle {
+  max-width: 38rem;
+  margin: 0;
+  color: rgba(232, 239, 249, 0.76);
+  font-size: clamp(1rem, 3.9vw, 1.35rem);
+  line-height: 1.7;
+  text-wrap: balance;
+}
+
+.suspension-image-shell {
+  width: min(32rem, 100%);
+  margin-top: 0.75rem;
+  padding: 1px;
+  border-radius: 1.5rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.04));
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: suspensionFadeUp 900ms 180ms cubic-bezier(0.2, 0.85, 0.22, 1) both;
+}
+
+.suspension-image-placeholder {
+  min-height: 11rem;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  overflow: hidden;
+  color: rgba(248, 251, 255, 0.56);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035)),
+    radial-gradient(circle at 24% 18%, rgba(62, 226, 197, 0.2), transparent 16rem),
+    radial-gradient(circle at 78% 82%, rgba(247, 201, 72, 0.14), transparent 14rem),
+    rgba(9, 14, 23, 0.78);
+  backdrop-filter: blur(20px);
+}
+
+.suspension-image-placeholder span {
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.14);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+@keyframes suspensionFadeUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 1.25rem, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes suspensionLoad {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.2;
+  }
+
+  65% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+@keyframes suspensionDrift {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  to {
+    transform: translate3d(4rem, 2rem, 0) rotate(8deg);
+  }
+}
+
+@keyframes suspensionFloat {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(1.2rem, -1rem, 0) scale(1.08);
+  }
+}
+
+@keyframes suspensionPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.42;
+  }
+
+  50% {
+    transform: scale(1.12);
+    opacity: 0.72;
+  }
+}
+
+@media (max-width: 620px) {
+  .suspension-page {
+    padding: 1rem;
+  }
+
+  .suspension-content {
+    gap: 0.85rem;
+    padding: 1.25rem 0;
+  }
+
+  .suspension-kicker {
+    font-size: 0.68rem;
+  }
+
+  .suspension-content h1 {
+    font-size: clamp(2.05rem, 10.5vw, 3.25rem);
+    line-height: 1.02;
+  }
+
+  .suspension-subtitle {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .suspension-image-shell {
+    width: 100%;
+    border-radius: 1.15rem;
+  }
+
+  .suspension-image-placeholder {
+    min-height: 12.5rem;
+    aspect-ratio: 4 / 3;
+  }
+
+  .suspension-orbit-one {
+    left: -2.5rem;
+  }
+
+  .suspension-orbit-two {
+    right: -1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suspension-page::before,
+  .suspension-loader,
+  .suspension-glow,
+  .suspension-orbit,
+  .suspension-content,
+  .suspension-image-shell {
+    animation: none;
+  }
+}
+
 .auth-screen {
   min-height: 100vh;
   display: grid;
