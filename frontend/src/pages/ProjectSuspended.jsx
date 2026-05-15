@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ChevronLeft,
   KeyRound,
   LockKeyhole,
   LogOut,
   MessageSquareText,
+  RefreshCw,
   SendHorizonal,
   ShieldCheck,
-  UserRound,
+  Trash2,
 } from 'lucide-react';
+import api from '../api/config.js';
 
 const USER_CODE = 'الشتا كتصب';
 const ADMIN_CODE = 'admin';
 const SESSION_KEY = 'reda_secure_portal_session';
-const CONVERSATIONS_KEY = 'reda_secure_portal_conversations';
-const USER_CONVERSATION_KEY = 'reda_secure_portal_user_conversation';
+const POLL_INTERVAL_MS = 1500;
 
 const safeJsonParse = (value, fallback) => {
   try {
@@ -24,42 +24,19 @@ const safeJsonParse = (value, fallback) => {
   }
 };
 
-const readStorage = (key, fallback) => {
+const readPortalSession = () => {
   if (typeof window === 'undefined') {
-    return fallback;
+    return null;
   }
 
-  return safeJsonParse(window.localStorage.getItem(key), fallback);
-};
+  const session = safeJsonParse(window.localStorage.getItem(SESSION_KEY), null);
 
-const writeStorage = (key, value) => {
-  window.localStorage.setItem(key, JSON.stringify(value));
-};
-
-const makeId = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
+  if (!session?.mode || !session?.code) {
+    window.localStorage.removeItem(SESSION_KEY);
+    return null;
   }
 
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
-
-const makeConversation = () => {
-  const id = makeId();
-  const now = new Date().toISOString();
-  const shortId = id.slice(0, 4).toUpperCase();
-
-  return {
-    id,
-    alias: `زائر مشفر ${shortId}`,
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
-  };
-};
-
-const sortConversations = (items) => {
-  return [...items].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  return session;
 };
 
 const formatTime = (value) => {
@@ -67,6 +44,14 @@ const formatTime = (value) => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+};
+
+const makeSession = (answer) => {
+  const code = answer.trim();
+  return {
+    mode: code.toLowerCase() === ADMIN_CODE ? 'admin' : 'user',
+    code,
+  };
 };
 
 const PortalFrame = ({ children, mode = 'gate' }) => (
@@ -108,7 +93,7 @@ const AccessGate = ({ code, error, errorKey, onCodeChange, onSubmit }) => (
       <input
         id="portal-code"
         className="portal-code-input"
-        type="password"
+        type="text"
         value={code}
         onChange={(event) => onCodeChange(event.target.value)}
         placeholder="اكتب الإجابة هنا"
@@ -129,13 +114,15 @@ const AccessGate = ({ code, error, errorKey, onCodeChange, onSubmit }) => (
   </section>
 );
 
-const MessageBubble = ({ message }) => {
-  const isAdmin = message.role === 'admin';
+const MessageBubble = ({ message, mode }) => {
+  const isAdminMessage = message.sender === 'admin';
+  const isMine = (mode === 'admin' && isAdminMessage) || (mode === 'user' && !isAdminMessage);
+  const senderLabel = isMine ? 'أنت' : isAdminMessage ? 'الأدمن' : 'المستخدم';
 
   return (
-    <article className={`portal-message ${isAdmin ? 'portal-message-admin' : 'portal-message-user'}`}>
+    <article className={`portal-message ${isAdminMessage ? 'portal-message-admin' : 'portal-message-user'}`}>
       <div className="portal-message-meta">
-        <span>{isAdmin ? 'الأدمن' : 'أنت'}</span>
+        <span>{senderLabel}</span>
         <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
       </div>
       <p>{message.text}</p>
@@ -158,127 +145,103 @@ const ChatComposer = ({ value, disabled, placeholder, onChange, onSubmit }) => (
   </form>
 );
 
-const UserChat = ({ conversation, message, onMessageChange, onSend, onLogout, endRef }) => (
+const ChatMessages = ({ messages, mode, loading, error, endRef }) => (
+  <div className="portal-messages" aria-live="polite">
+    {messages.length ? (
+      messages.map((item) => <MessageBubble key={item.id} message={item} mode={mode} />)
+    ) : (
+      <div className="portal-empty-chat">
+        <MessageSquareText size={34} />
+        <p>{loading ? 'جاري فتح القناة المشفرة...' : 'القناة فارغة الآن. أي رسالة جديدة ستظهر هنا مباشرة.'}</p>
+      </div>
+    )}
+
+    {error ? <p className="portal-chat-error">{error}</p> : null}
+    <span ref={endRef} />
+  </div>
+);
+
+const UserChat = ({ messages, draft, loading, error, sending, onDraftChange, onSend, onLogout, endRef }) => (
   <section className="portal-chat-shell">
     <header className="portal-chat-header">
       <div>
         <span className="portal-status-dot" />
-        <p>اتصال مشفر مع الأدمن</p>
-        <h2>{conversation?.alias || 'زائر مشفر'}</h2>
+        <p>غرفة واحدة مباشرة</p>
+        <h2>اتصال مشفر مع الأدمن</h2>
       </div>
       <button className="portal-icon-button" type="button" onClick={onLogout} aria-label="خروج آمن">
         <LogOut size={20} />
       </button>
     </header>
 
-    <div className="portal-messages" aria-live="polite">
-      {conversation?.messages?.length ? (
-        conversation.messages.map((item) => <MessageBubble key={item.id} message={item} />)
-      ) : (
-        <div className="portal-empty-chat">
-          <MessageSquareText size={34} />
-          <p>القناة مفتوحة الآن. اكتب رسالتك وسيظهر الرد هنا.</p>
-        </div>
-      )}
-      <span ref={endRef} />
-    </div>
+    <ChatMessages messages={messages} mode="user" loading={loading} error={error} endRef={endRef} />
 
     <ChatComposer
-      value={message}
-      onChange={onMessageChange}
+      value={draft}
+      onChange={onDraftChange}
       onSubmit={onSend}
       placeholder="اكتب رسالتك للأدمن..."
-      disabled={!conversation}
+      disabled={sending}
     />
   </section>
 );
 
 const AdminConsole = ({
-  conversations,
-  selectedConversation,
-  selectedConversationId,
-  reply,
-  onSelectConversation,
-  onReplyChange,
-  onReply,
+  messages,
+  draft,
+  loading,
+  error,
+  sending,
+  clearing,
+  onDraftChange,
+  onSend,
+  onClearMessages,
   onLogout,
+  onRefresh,
   endRef,
 }) => (
-  <section className="portal-admin-shell">
+  <section className="portal-admin-shell portal-single-room-shell">
     <header className="portal-admin-header">
       <div className="portal-admin-badge">
         <ShieldCheck size={20} />
         <span>وضع الأدمن</span>
       </div>
-      <button className="portal-ghost-button" type="button" onClick={onLogout}>
-        <LogOut size={18} />
-        <span>خروج آمن</span>
-      </button>
+
+      <div className="portal-admin-actions">
+        <button className="portal-ghost-button" type="button" onClick={onRefresh}>
+          <RefreshCw size={18} />
+          <span>تحديث</span>
+        </button>
+        <button className="portal-danger-button" type="button" onClick={onClearMessages} disabled={clearing}>
+          <Trash2 size={18} />
+          <span>حذف جميع الرسائل</span>
+        </button>
+        <button className="portal-ghost-button" type="button" onClick={onLogout}>
+          <LogOut size={18} />
+          <span>خروج آمن</span>
+        </button>
+      </div>
     </header>
 
-    <div className="portal-admin-layout">
-      <aside className="portal-conversation-list" aria-label="كل المحادثات">
-        <div className="portal-list-title">
-          <MessageSquareText size={18} />
-          <span>المحادثات</span>
-        </div>
-
-        {conversations.length ? (
-          conversations.map((conversation) => {
-            const isActive = conversation.id === selectedConversationId;
-            const lastMessage = conversation.messages[conversation.messages.length - 1];
-
-            return (
-              <button
-                className={`portal-conversation-card ${isActive ? 'is-active' : ''}`}
-                type="button"
-                key={conversation.id}
-                onClick={() => onSelectConversation(conversation.id)}
-              >
-                <UserRound size={18} />
-                <span>
-                  <strong>{conversation.alias}</strong>
-                  <small>{lastMessage?.text || 'لا توجد رسائل بعد'}</small>
-                </span>
-                <ChevronLeft size={16} />
-              </button>
-            );
-          })
-        ) : (
-          <div className="portal-admin-empty">
-            <p>لا توجد محادثات حاليا.</p>
-          </div>
-        )}
-      </aside>
-
-      <div className="portal-admin-chat">
+    <div className="portal-single-room-layout">
+      <div className="portal-admin-chat portal-admin-chat-single">
         <header className="portal-chat-header portal-chat-header-admin">
           <div>
             <span className="portal-status-dot" />
-            <p>لوحة الرد المشفر</p>
-            <h2>{selectedConversation?.alias || 'اختر محادثة'}</h2>
+            <p>غرفة واحدة مشتركة</p>
+            <h2>رسائل المستخدم والأدمن</h2>
           </div>
           <div className="portal-admin-chip">ADMIN</div>
         </header>
 
-        <div className="portal-messages" aria-live="polite">
-          {selectedConversation?.messages?.length ? (
-            selectedConversation.messages.map((item) => <MessageBubble key={item.id} message={item} />)
-          ) : (
-            <div className="portal-empty-chat">
-              <MessageSquareText size={34} />
-              <p>اختر محادثة من القائمة أو انتظر رسالة جديدة.</p>
-            </div>
-          )}
-          <span ref={endRef} />
-        </div>
+        <ChatMessages messages={messages} mode="admin" loading={loading} error={error} endRef={endRef} />
 
         <ChatComposer
-          value={reply}
-          onChange={onReplyChange}
-          onSubmit={onReply}
+          value={draft}
+          onChange={onDraftChange}
+          onSubmit={onSend}
           placeholder="اكتب رد الأدمن..."
-          disabled={!selectedConversation}
+          disabled={sending}
         />
       </div>
     </div>
@@ -286,75 +249,67 @@ const AdminConsole = ({
 );
 
 const ProjectSuspended = () => {
-  const [session, setSession] = useState(() => readStorage(SESSION_KEY, null));
-  const [conversations, setConversations] = useState(() => sortConversations(readStorage(CONVERSATIONS_KEY, [])));
-  const [selectedConversationId, setSelectedConversationId] = useState(null);
+  const [session, setSession] = useState(readPortalSession);
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
-  const [userMessage, setUserMessage] = useState('');
-  const [adminReply, setAdminReply] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [chatError, setChatError] = useState('');
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const endRef = useRef(null);
 
-  const selectedConversation = useMemo(() => {
-    if (session?.mode === 'user') {
-      return conversations.find((conversation) => conversation.id === session.conversationId);
-    }
+  const chatUrl = useCallback(() => {
+    return `/portal-chat?code=${encodeURIComponent(session?.code || '')}`;
+  }, [session?.code]);
 
-    return conversations.find((conversation) => conversation.id === selectedConversationId);
-  }, [conversations, selectedConversationId, session]);
-
-  const updateConversations = (updater) => {
-    setConversations((current) => {
-      const next = sortConversations(updater(current));
-      writeStorage(CONVERSATIONS_KEY, next);
-      return next;
-    });
-  };
-
-  const setPortalSession = (nextSession) => {
+  const saveSession = (nextSession) => {
     setSession(nextSession);
+
     if (nextSession) {
-      writeStorage(SESSION_KEY, nextSession);
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
       return;
     }
 
     window.localStorage.removeItem(SESSION_KEY);
   };
 
-  const ensureUserConversation = () => {
-    const savedId = window.localStorage.getItem(USER_CONVERSATION_KEY);
-    const existing = conversations.find((conversation) => conversation.id === savedId);
+  const fetchMessages = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!session?.code) {
+        return;
+      }
 
-    if (existing) {
-      return existing;
-    }
+      if (!silent) {
+        setLoadingMessages(true);
+      }
 
-    const conversation = makeConversation();
-    const next = sortConversations([...conversations, conversation]);
-    setConversations(next);
-    writeStorage(CONVERSATIONS_KEY, next);
-    window.localStorage.setItem(USER_CONVERSATION_KEY, conversation.id);
-    return conversation;
-  };
+      try {
+        const { data } = await api.get(chatUrl());
+        setMessages(data.messages || []);
+        setChatError('');
+      } catch (requestError) {
+        setChatError(requestError.message || 'تعذر تحديث الرسائل. تأكد أن الخادم يعمل.');
+      } finally {
+        if (!silent) {
+          setLoadingMessages(false);
+        }
+      }
+    },
+    [chatUrl, session?.code]
+  );
 
   const handleUnlock = (event) => {
     event.preventDefault();
     const answer = code.trim();
 
-    if (answer === USER_CODE) {
-      const conversation = ensureUserConversation();
-      setPortalSession({ mode: 'user', conversationId: conversation.id });
+    if (answer === USER_CODE || answer.toLowerCase() === ADMIN_CODE) {
+      saveSession(makeSession(answer));
       setError('');
       setCode('');
-      return;
-    }
-
-    if (answer.toLowerCase() === ADMIN_CODE) {
-      setPortalSession({ mode: 'admin' });
-      setSelectedConversationId(conversations[0]?.id || null);
-      setError('');
-      setCode('');
+      setMessages([]);
       return;
     }
 
@@ -362,82 +317,87 @@ const ProjectSuspended = () => {
     setErrorKey((current) => current + 1);
   };
 
-  const sendMessage = (conversationId, role, text) => {
-    const body = text.trim();
+  const handleSend = async (event) => {
+    event.preventDefault();
+    const text = draft.trim();
 
-    if (!body || !conversationId) {
+    if (!text || !session?.code) {
       return;
     }
 
-    const now = new Date().toISOString();
-    const message = {
-      id: makeId(),
-      role,
-      text: body,
-      createdAt: now,
-    };
+    setSending(true);
 
-    updateConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === conversationId
-          ? {
-              ...conversation,
-              updatedAt: now,
-              messages: [...conversation.messages, message],
-            }
-          : conversation
-      )
-    );
+    try {
+      const { data } = await api.post('/portal-chat/messages', { text, code: session.code });
+      setMessages(data.messages || []);
+      setDraft('');
+      setChatError('');
+    } catch (requestError) {
+      setChatError(requestError.message || 'تعذر إرسال الرسالة.');
+    } finally {
+      setSending(false);
+    }
   };
 
-  const handleUserSend = (event) => {
-    event.preventDefault();
-    sendMessage(session?.conversationId, 'user', userMessage);
-    setUserMessage('');
-  };
+  const handleClearMessages = async () => {
+    const confirmed = window.confirm('هل أنت متأكد أنك تريد حذف جميع الرسائل؟ لا يمكن التراجع عن هذا الإجراء.');
 
-  const handleAdminReply = (event) => {
-    event.preventDefault();
-    sendMessage(selectedConversationId, 'admin', adminReply);
-    setAdminReply('');
+    if (!confirmed || session?.mode !== 'admin') {
+      return;
+    }
+
+    setClearing(true);
+
+    try {
+      const { data } = await api.delete('/portal-chat/messages', {
+        data: {
+          code: session.code,
+        },
+      });
+      setMessages(data.messages || []);
+      setChatError('');
+    } catch (requestError) {
+      setChatError(requestError.message || 'تعذر حذف الرسائل.');
+    } finally {
+      setClearing(false);
+    }
   };
 
   const handleLogout = () => {
-    setPortalSession(null);
-    setSelectedConversationId(null);
-    setUserMessage('');
-    setAdminReply('');
+    saveSession(null);
+    setMessages([]);
+    setDraft('');
+    setChatError('');
   };
 
   useEffect(() => {
-    const handleStorage = (event) => {
-      if (event.key === CONVERSATIONS_KEY) {
-        setConversations(sortConversations(readStorage(CONVERSATIONS_KEY, [])));
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  useEffect(() => {
-    if (session?.mode === 'admin' && conversations.length && !conversations.some((item) => item.id === selectedConversationId)) {
-      setSelectedConversationId(conversations[0].id);
+    if (!session?.code) {
+      return undefined;
     }
-  }, [conversations, selectedConversationId, session]);
+
+    fetchMessages();
+    const intervalId = window.setInterval(() => {
+      fetchMessages({ silent: true });
+    }, POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [fetchMessages, session?.code]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [selectedConversation?.messages?.length, session?.mode]);
+  }, [messages.length, session?.mode]);
 
   if (session?.mode === 'user') {
     return (
       <PortalFrame mode="chat">
         <UserChat
-          conversation={selectedConversation}
-          message={userMessage}
-          onMessageChange={setUserMessage}
-          onSend={handleUserSend}
+          messages={messages}
+          draft={draft}
+          loading={loadingMessages}
+          error={chatError}
+          sending={sending}
+          onDraftChange={setDraft}
+          onSend={handleSend}
           onLogout={handleLogout}
           endRef={endRef}
         />
@@ -449,14 +409,17 @@ const ProjectSuspended = () => {
     return (
       <PortalFrame mode="admin">
         <AdminConsole
-          conversations={conversations}
-          selectedConversation={selectedConversation}
-          selectedConversationId={selectedConversationId}
-          reply={adminReply}
-          onSelectConversation={setSelectedConversationId}
-          onReplyChange={setAdminReply}
-          onReply={handleAdminReply}
+          messages={messages}
+          draft={draft}
+          loading={loadingMessages}
+          error={chatError}
+          sending={sending}
+          clearing={clearing}
+          onDraftChange={setDraft}
+          onSend={handleSend}
+          onClearMessages={handleClearMessages}
           onLogout={handleLogout}
+          onRefresh={() => fetchMessages()}
           endRef={endRef}
         />
       </PortalFrame>

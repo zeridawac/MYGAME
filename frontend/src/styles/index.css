@@ -686,6 +686,7 @@ textarea::placeholder {
 
 .portal-primary-button,
 .portal-ghost-button,
+.portal-danger-button,
 .portal-icon-button,
 .portal-composer button,
 .portal-conversation-card {
@@ -714,6 +715,7 @@ textarea::placeholder {
 .portal-composer button:hover,
 .portal-conversation-card:hover,
 .portal-ghost-button:hover,
+.portal-danger-button:hover,
 .portal-icon-button:hover {
   transform: translateY(-1px);
 }
@@ -804,6 +806,19 @@ textarea::placeholder {
   padding: 0 0.8rem;
 }
 
+.portal-danger-button {
+  min-height: 2.6rem;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  border: 1px solid rgba(255, 107, 139, 0.28);
+  color: #ffe1e8;
+  background: rgba(255, 107, 139, 0.1);
+}
+
+.portal-danger-button:disabled {
+  opacity: 0.55;
+}
+
 .portal-messages {
   flex: 1;
   min-height: 0;
@@ -880,6 +895,19 @@ textarea::placeholder {
   line-height: 1.8;
 }
 
+.portal-chat-error {
+  align-self: center;
+  max-width: 28rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(255, 107, 139, 0.28);
+  border-radius: var(--portal-radius);
+  color: #ffd6df;
+  background: rgba(255, 107, 139, 0.09);
+  text-align: center;
+  line-height: 1.7;
+}
+
 .portal-composer {
   display: grid;
   grid-template-columns: 1fr 3rem;
@@ -909,6 +937,13 @@ textarea::placeholder {
 
 .portal-admin-header {
   flex-wrap: wrap;
+}
+
+.portal-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
 }
 
 .portal-admin-badge,
@@ -995,6 +1030,17 @@ textarea::placeholder {
 .portal-admin-chat {
   display: flex;
   flex-direction: column;
+}
+
+.portal-single-room-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 0.75rem;
+}
+
+.portal-admin-chat-single {
+  width: 100%;
 }
 
 .portal-chat-header-admin {
@@ -1136,6 +1182,10 @@ textarea::placeholder {
     grid-template-columns: 20rem 1fr;
     grid-template-rows: 1fr;
   }
+
+  .portal-single-room-layout {
+    padding: 0.9rem;
+  }
 }
 
 @media (max-width: 620px) {
@@ -1183,6 +1233,20 @@ textarea::placeholder {
 
   .portal-admin-layout {
     gap: 0.6rem;
+    padding: 0.6rem;
+  }
+
+  .portal-admin-actions {
+    width: 100%;
+  }
+
+  .portal-admin-actions .portal-ghost-button,
+  .portal-admin-actions .portal-danger-button {
+    flex: 1;
+    min-width: 8rem;
+  }
+
+  .portal-single-room-layout {
     padding: 0.6rem;
   }
 
