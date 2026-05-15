@@ -306,11 +306,19 @@ const ChatComposer = ({
           </button>
 
           {pickerOpen ? (
-            <div className="portal-media-menu">
-              <MediaInputOption accept="image/*" icon={UploadCloud} label="رفع صورة" disabled={disabled} onPick={handlePick} />
-              <MediaInputOption accept="image/*" capture="environment" icon={Camera} label="التقاط صورة" disabled={disabled} onPick={handlePick} />
-              <MediaInputOption accept="video/*" icon={Film} label="رفع فيديو" disabled={disabled} onPick={handlePick} />
-              <MediaInputOption accept="video/*" capture="environment" icon={Video} label="تسجيل فيديو" disabled={disabled} onPick={handlePick} />
+            <div className="portal-media-overlay" onClick={() => setPickerOpen(false)}>
+              <div className="portal-media-menu" role="dialog" aria-label="اختيار الوسائط" onClick={(event) => event.stopPropagation()}>
+                <div className="portal-media-menu-header">
+                  <strong>إرسال وسائط</strong>
+                  <button type="button" onClick={() => setPickerOpen(false)} aria-label="إغلاق">
+                    <X size={18} />
+                  </button>
+                </div>
+                <MediaInputOption accept="image/*" icon={UploadCloud} label="اختيار صورة" disabled={disabled} onPick={handlePick} />
+                <MediaInputOption accept="image/*" capture="environment" icon={Camera} label="التقاط صورة بالكاميرا" disabled={disabled} onPick={handlePick} />
+                <MediaInputOption accept="video/*" icon={Film} label="اختيار فيديو" disabled={disabled} onPick={handlePick} />
+                <MediaInputOption accept="video/*" capture="environment" icon={Video} label="تسجيل فيديو بالكاميرا" disabled={disabled} onPick={handlePick} />
+              </div>
             </div>
           ) : null}
         </div>
