@@ -8,6 +8,8 @@ const {
   createPortalMessage,
   listPortalMessages,
   markAdminMessagesRead,
+  resetPortalCoins,
+  rewardPortalMedia,
   uploadPortalMedia,
 } = require('../controllers/portalChatController');
 
@@ -29,7 +31,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 25 * 1024 * 1024,
+    fileSize: 100 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     const allowedMimeTypes = new Set([
@@ -52,10 +54,29 @@ const upload = multer({
   },
 });
 
+const handleUpload = (req, res, next) => {
+  upload.single('media')(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      res.status(400);
+      next(new Error('حجم الفيديو كبير جداً، الحد الأقصى هو 100MB.'));
+      return;
+    }
+
+    next(error);
+  });
+};
+
 router.get('/', listPortalMessages);
 router.post('/messages', createPortalMessage);
-router.post('/uploads', upload.single('media'), uploadPortalMedia);
+router.post('/uploads', handleUpload, uploadPortalMedia);
 router.post('/read', markAdminMessagesRead);
+router.post('/rewards', rewardPortalMedia);
+router.post('/coins/reset', resetPortalCoins);
 router.delete('/messages', clearPortalMessages);
 
 module.exports = router;

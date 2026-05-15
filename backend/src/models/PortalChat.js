@@ -4,7 +4,7 @@ const portalMessageSchema = new mongoose.Schema(
   {
     sender: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'admin', 'system'],
       required: true,
     },
     text: {
@@ -58,9 +58,37 @@ const portalMessageSchema = new mongoose.Schema(
       enum: ['', 'image', 'video'],
       default: '',
     },
+    rewardCoins: {
+      type: Number,
+      default: 0,
+    },
     readByUserAt: {
       type: Date,
       default: null,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true }
+);
+
+const rewardHistorySchema = new mongoose.Schema(
+  {
+    messageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    mediaType: {
+      type: String,
+      enum: ['image', 'video'],
+      required: true,
+    },
+    coins: {
+      type: Number,
+      required: true,
+      min: 1,
     },
     createdAt: {
       type: Date,
@@ -80,6 +108,15 @@ const portalChatSchema = new mongoose.Schema(
     },
     messages: {
       type: [portalMessageSchema],
+      default: [],
+    },
+    coinBalance: {
+      type: Number,
+      default: 500,
+      min: 0,
+    },
+    rewardHistory: {
+      type: [rewardHistorySchema],
       default: [],
     },
     lastClearedAt: {

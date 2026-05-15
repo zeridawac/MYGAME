@@ -7,7 +7,10 @@ const ROOM_KEY = 'main';
 const USER_CODE = 'الشتا كتصب';
 const USER_CODE_SHORT = 'شتا كتصب';
 const ADMIN_CODE = 'admin';
+const DEFAULT_COIN_BALANCE = 500;
 const MAX_MESSAGES = 500;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const UPLOAD_PUBLIC_BASE = '/uploads/portal-chat';
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads', 'portal-chat');
 const MEDIA_TYPES = {
@@ -50,8 +53,17 @@ const presentMessage = (message) => ({
   mediaMime: message.mediaMime || message.imageMime,
   mediaSize: message.mediaSize || message.imageSize,
   mediaType: message.mediaType || (message.imageUrl ? 'image' : ''),
+  rewardCoins: message.rewardCoins,
   readByUserAt: message.readByUserAt,
   createdAt: message.createdAt,
+});
+
+const presentReward = (reward) => ({
+  id: reward._id.toString(),
+  messageId: reward.messageId?.toString() || null,
+  mediaType: reward.mediaType,
+  coins: reward.coins,
+  createdAt: reward.createdAt,
 });
 
 const getMediaType = (mimeType = '', fallbackUrl = '') => {
@@ -92,19 +104,45 @@ const removeUploadedMedia = async (messages) => {
   );
 };
 
+const ensureCoinFields = (room) => {
+  let changed = false;
+
+  if (typeof room.coinBalance !== 'number') {
+    room.coinBalance = DEFAULT_COIN_BALANCE;
+    changed = true;
+  }
+
+  if (!Array.isArray(room.rewardHistory)) {
+    room.rewardHistory = [];
+    changed = true;
+  }
+
+  return changed;
+};
+
 const getSharedRoom = async () => {
-  return PortalChat.findOneAndUpdate(
+  const room = await PortalChat.findOneAndUpdate(
     { roomKey: ROOM_KEY },
-    { $setOnInsert: { roomKey: ROOM_KEY, messages: [] } },
+    { $setOnInsert: { roomKey: ROOM_KEY, messages: [], coinBalance: DEFAULT_COIN_BALANCE, rewardHistory: [] } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
+
+  if (ensureCoinFields(room)) {
+    await room.save();
+  }
+
+  return room;
 };
 
 const sendRoom = (res, room) => {
+  ensureCoinFields(room);
+
   res.json({
     success: true,
     roomKey: ROOM_KEY,
     messages: room.messages.map(presentMessage),
+    coinBalance: room.coinBalance,
+    rewardHistory: room.rewardHistory.map(presentReward),
     updatedAt: room.updatedAt,
     lastClearedAt: room.lastClearedAt,
   });
@@ -200,6 +238,18 @@ const uploadPortalMedia = asyncHandler(async (req, res) => {
     throw new Error('نوع الوسائط غير مدعوم');
   }
 
+  if (mediaType === 'image' && req.file.size > MAX_IMAGE_SIZE) {
+    await fs.unlink(req.file.path).catch(() => {});
+    res.status(400);
+    throw new Error('حجم الصورة كبير جداً، الحد الأقصى هو 10MB.');
+  }
+
+  if (mediaType === 'video' && req.file.size > MAX_VIDEO_SIZE) {
+    await fs.unlink(req.file.path).catch(() => {});
+    res.status(400);
+    throw new Error('حجم الفيديو كبير جداً، الحد الأقصى هو 100MB.');
+  }
+
   res.status(201).json({
     success: true,
     media: {
@@ -239,6 +289,91 @@ const markAdminMessagesRead = asyncHandler(async (req, res) => {
   sendRoom(res, room);
 });
 
+const rewardPortalMedia = asyncHandler(async (req, res) => {
+  const sender = getPortalRole(req);
+
+  if (sender !== 'admin') {
+    res.status(403);
+    throw new Error('منح الكوينات متاح للأدمن فقط');
+  }
+
+  const messageId = String(req.body?.messageId || '').trim();
+  const coins = Number(req.body?.coins);
+
+  if (!messageId) {
+    res.status(400);
+    throw new Error('يجب اختيار رسالة الوسائط');
+  }
+
+  if (!Number.isInteger(coins) || coins <= 0) {
+    res.status(400);
+    throw new Error('أدخل عدد كوينات صحيح أكبر من صفر');
+  }
+
+  if (coins > 1000000) {
+    res.status(400);
+    throw new Error('عدد الكوينات كبير جداً');
+  }
+
+  const room = await getSharedRoom();
+  ensureCoinFields(room);
+
+  const targetMessage = room.messages.id(messageId);
+
+  if (!targetMessage || !targetMessage.mediaUrl) {
+    res.status(404);
+    throw new Error('رسالة الوسائط غير موجودة');
+  }
+
+  const mediaType = targetMessage.mediaType || getMediaType(targetMessage.mediaMime, targetMessage.mediaUrl);
+
+  if (!['image', 'video'].includes(mediaType)) {
+    res.status(400);
+    throw new Error('هذه الرسالة لا تحتوي على وسائط قابلة للإعجاب');
+  }
+
+  room.coinBalance += coins;
+  room.rewardHistory.push({
+    messageId: targetMessage._id,
+    mediaType,
+    coins,
+    createdAt: new Date(),
+  });
+
+  room.messages.push({
+    sender: 'system',
+    text: mediaType === 'video'
+      ? `الأدمن أعجب بالفيديو وقد حصلت على ${coins} كوين`
+      : `الأدمن أعجب بالصورة وقد حصلت على ${coins} كوين`,
+    rewardCoins: coins,
+    createdAt: new Date(),
+  });
+
+  if (room.messages.length > MAX_MESSAGES) {
+    await removeUploadedMedia(room.messages.slice(0, room.messages.length - MAX_MESSAGES));
+    room.messages = room.messages.slice(room.messages.length - MAX_MESSAGES);
+  }
+
+  await room.save();
+  sendRoom(res, room);
+});
+
+const resetPortalCoins = asyncHandler(async (req, res) => {
+  const sender = getPortalRole(req);
+
+  if (sender !== 'admin') {
+    res.status(403);
+    throw new Error('إعادة ضبط الكوينات متاحة للأدمن فقط');
+  }
+
+  const room = await getSharedRoom();
+  room.coinBalance = DEFAULT_COIN_BALANCE;
+  room.rewardHistory = [];
+  await room.save();
+
+  sendRoom(res, room);
+});
+
 const clearPortalMessages = asyncHandler(async (req, res) => {
   const sender = getPortalRole(req);
 
@@ -261,5 +396,7 @@ module.exports = {
   createPortalMessage,
   uploadPortalMedia,
   markAdminMessagesRead,
+  rewardPortalMedia,
+  resetPortalCoins,
   clearPortalMessages,
 };

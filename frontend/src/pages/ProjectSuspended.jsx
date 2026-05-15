@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Camera,
   CheckCheck,
+  Coins,
   Film,
+  Heart,
   ImagePlus,
   KeyRound,
   LockKeyhole,
@@ -10,6 +12,7 @@ import {
   MessageSquareText,
   Play,
   RefreshCw,
+  RotateCcw,
   SendHorizonal,
   ShieldCheck,
   Trash2,
@@ -23,7 +26,9 @@ const USER_CODES = ['الشتا كتصب', 'شتا كتصب'];
 const ADMIN_CODE = 'admin';
 const SESSION_KEY = 'reda_secure_portal_session';
 const POLL_INTERVAL_MS = 1500;
-const MAX_MEDIA_SIZE = 25 * 1024 * 1024;
+const DEFAULT_COIN_BALANCE = 500;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const API_ORIGIN = API_URL.startsWith('http') ? API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '') : '';
 
@@ -47,7 +52,15 @@ const getMediaType = (mimeType = '', fallback = '') => {
     return 'image';
   }
 
-  return /\.(mp4|webm|mov)$/i.test(fallback) ? 'video' : fallback ? 'image' : '';
+  if (/\.(jpg|jpeg|png|webp)$/i.test(fallback)) {
+    return 'image';
+  }
+
+  if (/\.(mp4|webm|mov)$/i.test(fallback)) {
+    return 'video';
+  }
+
+  return '';
 };
 
 const getAssetUrl = (url) => {
@@ -82,6 +95,13 @@ const formatTime = (value) => {
   return new Intl.DateTimeFormat('ar-MA', {
     hour: '2-digit',
     minute: '2-digit',
+  }).format(new Date(value));
+};
+
+const formatDateTime = (value) => {
+  return new Intl.DateTimeFormat('ar-MA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
   }).format(new Date(value));
 };
 
@@ -153,40 +173,67 @@ const AccessGate = ({ code, error, errorKey, onCodeChange, onSubmit }) => (
   </section>
 );
 
-const MessageBubble = ({ message, mode, onOpenMedia }) => {
+const MessageBubble = ({ message, mode, onOpenMedia, onRewardMedia }) => {
+  const isSystemMessage = message.sender === 'system';
   const isAdminMessage = message.sender === 'admin';
   const isMine = (mode === 'admin' && isAdminMessage) || (mode === 'user' && !isAdminMessage);
-  const senderLabel = isMine ? 'أنت' : isAdminMessage ? 'الأدمن' : 'المستخدم';
+  const senderLabel = isSystemMessage ? 'النظام' : isMine ? 'أنت' : isAdminMessage ? 'الأدمن' : 'المستخدم';
   const mediaUrl = getAssetUrl(message.mediaUrl || message.imageUrl);
   const mediaName = message.mediaName || message.imageName || 'وسائط داخل الرسالة';
   const mediaMime = message.mediaMime || message.imageMime || '';
   const mediaType = message.mediaType || getMediaType(mediaMime, mediaUrl);
+  const mediaPayload = { url: mediaUrl, name: mediaName, type: mediaType, mimeType: mediaMime };
 
   return (
-    <article className={`portal-message ${isAdminMessage ? 'portal-message-admin' : 'portal-message-user'}`}>
+    <article
+      className={`portal-message ${
+        isSystemMessage ? 'portal-message-system' : isAdminMessage ? 'portal-message-admin' : 'portal-message-user'
+      }`}
+    >
       <div className="portal-message-meta">
         <span>{senderLabel}</span>
         <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
       </div>
 
       {mediaUrl ? (
-        <button
-          className={`portal-media-thumb portal-media-thumb-${mediaType || 'image'}`}
-          type="button"
-          onClick={() => onOpenMedia({ url: mediaUrl, name: mediaName, type: mediaType, mimeType: mediaMime })}
-          aria-label="فتح الوسائط"
-        >
-          {mediaType === 'video' ? (
-            <>
-              <video src={mediaUrl} preload="metadata" muted playsInline />
-              <span className="portal-play-badge">
-                <Play size={22} fill="currentColor" />
-              </span>
-            </>
-          ) : (
-            <img src={mediaUrl} alt={mediaName} />
-          )}
-        </button>
+        <>
+          {mode === 'admin' ? (
+            <div className="portal-media-actions">
+              <button type="button" onClick={() => onOpenMedia(mediaPayload)}>
+                فتح
+              </button>
+              <button type="button" onClick={() => onRewardMedia?.(message)}>
+                <Heart size={14} />
+                إعجاب
+              </button>
+            </div>
+          ) : null}
+
+          <button
+            className={`portal-media-thumb portal-media-thumb-${mediaType || 'image'}`}
+            type="button"
+            onClick={() => onOpenMedia(mediaPayload)}
+            aria-label="فتح الوسائط"
+          >
+            {mediaType === 'video' ? (
+              <>
+                <video src={mediaUrl} preload="metadata" muted playsInline />
+                <span className="portal-play-badge">
+                  <Play size={22} fill="currentColor" />
+                </span>
+              </>
+            ) : (
+              <img src={mediaUrl} alt={mediaName} />
+            )}
+          </button>
+        </>
+      ) : null}
+
+      {message.rewardCoins ? (
+        <span className="portal-system-reward">
+          <Coins size={14} />
+          +{message.rewardCoins} كوين
+        </span>
       ) : null}
 
       {message.text ? <p>{message.text}</p> : null}
@@ -338,10 +385,12 @@ const ChatComposer = ({
   );
 };
 
-const ChatMessages = ({ messages, mode, loading, error, endRef, onOpenMedia }) => (
+const ChatMessages = ({ messages, mode, loading, error, endRef, onOpenMedia, onRewardMedia }) => (
   <div className="portal-messages" aria-live="polite">
     {messages.length ? (
-      messages.map((item) => <MessageBubble key={item.id} message={item} mode={mode} onOpenMedia={onOpenMedia} />)
+      messages.map((item) => (
+        <MessageBubble key={item.id} message={item} mode={mode} onOpenMedia={onOpenMedia} onRewardMedia={onRewardMedia} />
+      ))
     ) : (
       <div className="portal-empty-chat">
         <MessageSquareText size={34} />
@@ -362,10 +411,12 @@ const UserChat = ({
   sending,
   selectedMedia,
   mediaPreview,
+  coinBalance,
   onDraftChange,
   onMediaChange,
   onClearMedia,
   onOpenMedia,
+  onShowCoinDetails,
   onSend,
   onLogout,
   endRef,
@@ -377,9 +428,16 @@ const UserChat = ({
         <p>غرفة واحدة مباشرة</p>
         <h2>اتصال مشفر مع الأدمن</h2>
       </div>
-      <button className="portal-icon-button" type="button" onClick={onLogout} aria-label="خروج آمن">
-        <LogOut size={20} />
-      </button>
+      <div className="portal-user-header-actions">
+        <button className="portal-coin-badge" type="button" onClick={onShowCoinDetails}>
+          <Coins size={18} />
+          <span>رصيد الكوينات: {coinBalance} كوين</span>
+          <small>اضغط للتفاصيل</small>
+        </button>
+        <button className="portal-icon-button" type="button" onClick={onLogout} aria-label="خروج آمن">
+          <LogOut size={20} />
+        </button>
+      </div>
     </header>
 
     <ChatMessages messages={messages} mode="user" loading={loading} error={error} endRef={endRef} onOpenMedia={onOpenMedia} />
@@ -411,10 +469,13 @@ const AdminConsole = ({
   onMediaChange,
   onClearMedia,
   onOpenMedia,
+  onRewardMedia,
   onSend,
   onClearMessages,
   onLogout,
   onRefresh,
+  onResetCoins,
+  resettingCoins,
   endRef,
 }) => (
   <section className="portal-admin-shell portal-single-room-shell">
@@ -428,6 +489,10 @@ const AdminConsole = ({
         <button className="portal-ghost-button" type="button" onClick={onRefresh}>
           <RefreshCw size={18} />
           <span>تحديث</span>
+        </button>
+        <button className="portal-ghost-button" type="button" onClick={onResetCoins} disabled={resettingCoins}>
+          <RotateCcw size={18} />
+          <span>إعادة ضبط الكوينات</span>
         </button>
         <button className="portal-danger-button" type="button" onClick={onClearMessages} disabled={clearing}>
           <Trash2 size={18} />
@@ -451,7 +516,15 @@ const AdminConsole = ({
           <div className="portal-admin-chip">ADMIN</div>
         </header>
 
-        <ChatMessages messages={messages} mode="admin" loading={loading} error={error} endRef={endRef} onOpenMedia={onOpenMedia} />
+        <ChatMessages
+          messages={messages}
+          mode="admin"
+          loading={loading}
+          error={error}
+          endRef={endRef}
+          onOpenMedia={onOpenMedia}
+          onRewardMedia={onRewardMedia}
+        />
 
         <ChatComposer
           value={draft}
@@ -469,6 +542,115 @@ const AdminConsole = ({
   </section>
 );
 
+const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
+  const totalEarned = rewards.reduce((sum, reward) => sum + Number(reward.coins || 0), 0);
+
+  return (
+    <div className="portal-modal" role="dialog" aria-modal="true" aria-label="تفاصيل رصيد الكوينات" onClick={onClose}>
+      <div className="portal-modal-panel portal-details-modal" onClick={(event) => event.stopPropagation()}>
+        <button className="portal-modal-close" type="button" onClick={onClose} aria-label="إغلاق">
+          <X size={20} />
+        </button>
+
+        <div className="portal-modal-heading">
+          <Coins size={22} />
+          <div>
+            <span>تفاصيل الرصيد</span>
+            <h3>رصيد الكوينات</h3>
+          </div>
+        </div>
+
+        <div className="portal-stats-grid">
+          <article>
+            <span>الرصيد الحالي</span>
+            <strong>{coinBalance} كوين</strong>
+          </article>
+          <article>
+            <span>إعجابات الأدمن</span>
+            <strong>{rewards.length}</strong>
+          </article>
+          <article>
+            <span>المكتسب من الإعجابات</span>
+            <strong>{totalEarned} كوين</strong>
+          </article>
+        </div>
+
+        <div className="portal-reward-history">
+          <h4>سجل المكافآت</h4>
+          {rewards.length ? (
+            rewards
+              .slice()
+              .reverse()
+              .map((reward) => (
+                <article key={reward.id || `${reward.createdAt}-${reward.coins}`}>
+                  <span>{reward.mediaType === 'video' ? 'فيديو' : 'صورة'}</span>
+                  <strong>+{reward.coins} كوين</strong>
+                  <time dateTime={reward.createdAt}>{formatDateTime(reward.createdAt)}</time>
+                </article>
+              ))
+          ) : (
+            <p>لا توجد مكافآت من الأدمن حتى الآن.</p>
+          )}
+        </div>
+
+        <p className="portal-details-note">
+          رصيد الكوينات الذي تملكه عند فتح الموقع يمكنك سحبه مباشرة، أو استثماره داخل الموقع.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const RewardModal = ({ target, amount, error, saving, onAmountChange, onClose, onConfirm }) => {
+  if (!target) {
+    return null;
+  }
+
+  const mediaType = target.mediaType || getMediaType(target.mediaMime || target.imageMime, target.mediaUrl || target.imageUrl);
+
+  return (
+    <div className="portal-modal" role="dialog" aria-modal="true" aria-label="منح مكافأة" onClick={onClose}>
+      <form className="portal-modal-panel portal-reward-modal" onSubmit={onConfirm} onClick={(event) => event.stopPropagation()}>
+        <button className="portal-modal-close" type="button" onClick={onClose} aria-label="إغلاق">
+          <X size={20} />
+        </button>
+
+        <div className="portal-modal-heading">
+          <Heart size={22} />
+          <div>
+            <span>{mediaType === 'video' ? 'إعجاب بالفيديو' : 'إعجاب بالصورة'}</span>
+            <h3>منح كوينات للمستخدم</h3>
+          </div>
+        </div>
+
+        <label className="portal-reward-field">
+          <span>عدد الكوينات</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={amount}
+            onChange={(event) => onAmountChange(event.target.value)}
+            placeholder="مثال: 50"
+            autoFocus
+          />
+        </label>
+
+        {error ? <p className="portal-chat-error">{error}</p> : null}
+
+        <div className="portal-modal-actions">
+          <button className="portal-ghost-button" type="button" onClick={onClose} disabled={saving}>
+            إلغاء
+          </button>
+          <button className="portal-primary-button" type="submit" disabled={saving}>
+            {saving ? 'جاري المنح...' : 'تأكيد المكافأة'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 const ProjectSuspended = () => {
   const [session, setSession] = useState(readPortalSession);
   const [code, setCode] = useState('');
@@ -483,6 +665,14 @@ const ProjectSuspended = () => {
   const [activeMedia, setActiveMedia] = useState(null);
   const [sending, setSending] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [coinBalance, setCoinBalance] = useState(DEFAULT_COIN_BALANCE);
+  const [rewardHistory, setRewardHistory] = useState([]);
+  const [coinDetailsOpen, setCoinDetailsOpen] = useState(false);
+  const [rewardTarget, setRewardTarget] = useState(null);
+  const [rewardAmount, setRewardAmount] = useState('');
+  const [rewardError, setRewardError] = useState('');
+  const [rewarding, setRewarding] = useState(false);
+  const [resettingCoins, setResettingCoins] = useState(false);
   const endRef = useRef(null);
 
   const chatUrl = useCallback(() => {
@@ -499,6 +689,12 @@ const ProjectSuspended = () => {
 
     window.sessionStorage.removeItem(SESSION_KEY);
   };
+
+  const applyRoomData = useCallback((data) => {
+    setMessages(data?.messages || []);
+    setCoinBalance(Number.isFinite(Number(data?.coinBalance)) ? Number(data.coinBalance) : DEFAULT_COIN_BALANCE);
+    setRewardHistory(Array.isArray(data?.rewardHistory) ? data.rewardHistory : []);
+  }, []);
 
   const clearSelectedMedia = useCallback(() => {
     if (mediaPreview) {
@@ -523,8 +719,13 @@ const ProjectSuspended = () => {
         return;
       }
 
-      if (file.size > MAX_MEDIA_SIZE) {
-        setChatError('حجم الملف يجب ألا يتجاوز 25MB.');
+      if (mediaType === 'image' && file.size > MAX_IMAGE_SIZE) {
+        setChatError('حجم الصورة كبير جداً، الحد الأقصى هو 10MB.');
+        return;
+      }
+
+      if (mediaType === 'video' && file.size > MAX_VIDEO_SIZE) {
+        setChatError('حجم الفيديو كبير جداً، الحد الأقصى هو 100MB.');
         return;
       }
 
@@ -552,9 +753,9 @@ const ProjectSuspended = () => {
       }
 
       const { data } = await api.post('/portal-chat/read', { code: session.code });
-      setMessages(data.messages || []);
+      applyRoomData(data);
     },
-    [session?.code, session?.mode]
+    [applyRoomData, session?.code, session?.mode]
   );
 
   const fetchMessages = useCallback(
@@ -570,7 +771,7 @@ const ProjectSuspended = () => {
       try {
         const { data } = await api.get(chatUrl());
         const nextMessages = data.messages || [];
-        setMessages(nextMessages);
+        applyRoomData(data);
         setChatError('');
         await markAdminMessagesRead(nextMessages);
       } catch (requestError) {
@@ -581,7 +782,7 @@ const ProjectSuspended = () => {
         }
       }
     },
-    [chatUrl, markAdminMessagesRead, session?.code]
+    [applyRoomData, chatUrl, markAdminMessagesRead, session?.code]
   );
 
   const handleUnlock = (event) => {
@@ -593,6 +794,8 @@ const ProjectSuspended = () => {
       setError('');
       setCode('');
       setMessages([]);
+      setCoinBalance(DEFAULT_COIN_BALANCE);
+      setRewardHistory([]);
       return;
     }
 
@@ -626,7 +829,7 @@ const ProjectSuspended = () => {
     try {
       const media = await uploadSelectedMedia();
       const { data } = await api.post('/portal-chat/messages', { text, media, code: session.code });
-      setMessages(data.messages || []);
+      applyRoomData(data);
       setDraft('');
       clearSelectedMedia();
       setChatError('');
@@ -652,7 +855,7 @@ const ProjectSuspended = () => {
           code: session.code,
         },
       });
-      setMessages(data.messages || []);
+      applyRoomData(data);
       setChatError('');
       setActiveMedia(null);
     } catch (requestError) {
@@ -662,12 +865,76 @@ const ProjectSuspended = () => {
     }
   };
 
+  const openRewardModal = (message) => {
+    setRewardTarget(message);
+    setRewardAmount('');
+    setRewardError('');
+  };
+
+  const handleConfirmReward = async (event) => {
+    event.preventDefault();
+
+    if (session?.mode !== 'admin' || !rewardTarget) {
+      return;
+    }
+
+    const coins = Number(rewardAmount);
+
+    if (!Number.isInteger(coins) || coins <= 0) {
+      setRewardError('أدخل عدد كوينات صحيح أكبر من صفر.');
+      return;
+    }
+
+    setRewarding(true);
+    setRewardError('');
+
+    try {
+      const { data } = await api.post('/portal-chat/rewards', {
+        code: session.code,
+        messageId: rewardTarget.id,
+        coins,
+      });
+      applyRoomData(data);
+      setRewardTarget(null);
+      setRewardAmount('');
+      setChatError('');
+    } catch (requestError) {
+      setRewardError(requestError.message || 'تعذر منح المكافأة.');
+    } finally {
+      setRewarding(false);
+    }
+  };
+
+  const handleResetCoins = async () => {
+    const confirmed = window.confirm('هل أنت متأكد أنك تريد إعادة ضبط رصيد الكوينات إلى 500؟');
+
+    if (!confirmed || session?.mode !== 'admin') {
+      return;
+    }
+
+    setResettingCoins(true);
+
+    try {
+      const { data } = await api.post('/portal-chat/coins/reset', { code: session.code });
+      applyRoomData(data);
+      setChatError('');
+    } catch (requestError) {
+      setChatError(requestError.message || 'تعذر إعادة ضبط الكوينات.');
+    } finally {
+      setResettingCoins(false);
+    }
+  };
+
   const handleLogout = () => {
     saveSession(null);
     setMessages([]);
     setDraft('');
     clearSelectedMedia();
     setActiveMedia(null);
+    setCoinDetailsOpen(false);
+    setRewardTarget(null);
+    setRewardHistory([]);
+    setCoinBalance(DEFAULT_COIN_BALANCE);
     setChatError('');
   };
 
@@ -707,14 +974,19 @@ const ProjectSuspended = () => {
           sending={sending}
           selectedMedia={selectedMedia}
           mediaPreview={mediaPreview}
+          coinBalance={coinBalance}
           onDraftChange={setDraft}
           onMediaChange={handleMediaChange}
           onClearMedia={clearSelectedMedia}
           onOpenMedia={setActiveMedia}
+          onShowCoinDetails={() => setCoinDetailsOpen(true)}
           onSend={handleSend}
           onLogout={handleLogout}
           endRef={endRef}
         />
+        {coinDetailsOpen ? (
+          <CoinDetailsModal coinBalance={coinBalance} rewards={rewardHistory} onClose={() => setCoinDetailsOpen(false)} />
+        ) : null}
         <MediaLightbox media={activeMedia} onClose={() => setActiveMedia(null)} />
       </PortalFrame>
     );
@@ -736,11 +1008,23 @@ const ProjectSuspended = () => {
           onMediaChange={handleMediaChange}
           onClearMedia={clearSelectedMedia}
           onOpenMedia={setActiveMedia}
+          onRewardMedia={openRewardModal}
           onSend={handleSend}
           onClearMessages={handleClearMessages}
           onLogout={handleLogout}
           onRefresh={() => fetchMessages()}
+          onResetCoins={handleResetCoins}
+          resettingCoins={resettingCoins}
           endRef={endRef}
+        />
+        <RewardModal
+          target={rewardTarget}
+          amount={rewardAmount}
+          error={rewardError}
+          saving={rewarding}
+          onAmountChange={setRewardAmount}
+          onClose={() => setRewardTarget(null)}
+          onConfirm={handleConfirmReward}
         />
         <MediaLightbox media={activeMedia} onClose={() => setActiveMedia(null)} />
       </PortalFrame>
