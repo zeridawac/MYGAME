@@ -20,6 +20,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Loading from '../components/Loading.jsx';
 import StatCard from '../components/StatCard.jsx';
+import { formatCoins, formatDhFromCoins } from '../utils/coins.js';
 
 const navCards = [
   { to: '/games', title: 'الألعاب', text: 'عجلة يومية ومكافآت سريعة', icon: Gamepad2 },
@@ -76,13 +77,19 @@ const Dashboard = () => {
       </section>
 
       <section className="stats-grid">
-        <StatCard icon={Banknote} label="رصيد العملات" value={Math.round(currentUser.coins)} tone="gold" />
+        <StatCard
+          icon={Banknote}
+          label="رصيد الكوينات"
+          value={formatCoins(currentUser.coins)}
+          tone="gold"
+          footer={`${formatDhFromCoins(currentUser.coins)} DH`}
+        />
         <StatCard
           icon={BadgeDollarSign}
-          label="القيمة بالدولار"
-          value={`$${dashboard?.coinRate?.dollarEquivalent || 0}`}
+          label="القيمة بالدرهم"
+          value={`${formatDhFromCoins(currentUser.coins)} DH`}
           tone="green"
-          footer={`${dashboard?.coinRate?.coinsPerDollar || 1000} عملة = $1`}
+          footer="1000 كوين = 100 DH"
         />
         <StatCard icon={Sparkles} label="النقاط" value={Math.round(currentUser.points)} tone="cyan" />
         <StatCard icon={Flame} label="السلسلة اليومية" value={`${currentUser.streak} يوم`} tone="rose" />

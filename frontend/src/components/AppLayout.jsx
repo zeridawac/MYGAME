@@ -16,6 +16,7 @@ import {
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { formatCoinDh } from '../utils/coins.js';
 
 const baseNav = [
   { to: '/dashboard', label: 'الرئيسية', icon: CircleGauge },
@@ -82,7 +83,7 @@ const AppLayout = () => {
           </div>
           <div className="user-pill">
             <Banknote size={18} />
-            <span>{Math.round(user?.coins || 0)} عملة</span>
+            <span>{formatCoinDh(user?.coins || 0)}</span>
           </div>
         </header>
         <Outlet />

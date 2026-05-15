@@ -5,6 +5,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import Loading from '../components/Loading.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { formatCoinDh } from '../utils/coins.js';
 
 const statusLabels = {
   pending: 'قيد المراجعة',
@@ -91,7 +92,7 @@ const Withdrawals = () => {
               <span>{submitting ? 'جاري الإرسال...' : 'إرسال طلب السحب'}</span>
             </button>
           </form>
-          <p className="helper-text">رصيدك الحالي: {Math.round(user?.coins || 0)} عملة</p>
+          <p className="helper-text">رصيدك الحالي: {formatCoinDh(user?.coins || 0)}</p>
         </div>
 
         <div className="panel">

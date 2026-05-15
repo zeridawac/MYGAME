@@ -565,6 +565,94 @@ textarea::placeholder {
   animation: portalFadeUp 820ms cubic-bezier(0.2, 0.85, 0.22, 1) both;
 }
 
+.portal-entry-choice {
+  width: min(34rem, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 1.15rem;
+  text-align: center;
+  animation: portalFadeUp 820ms cubic-bezier(0.2, 0.85, 0.22, 1) both;
+}
+
+.portal-choice-copy {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.portal-choice-copy h1 {
+  margin: 0;
+  color: var(--portal-text);
+  font-size: clamp(2.25rem, 11vw, 4.7rem);
+  line-height: 1.04;
+  font-weight: 950;
+  text-shadow:
+    0 0 32px rgba(66, 245, 215, 0.12),
+    0 22px 70px rgba(0, 0, 0, 0.5);
+}
+
+.portal-choice-copy p {
+  max-width: 30rem;
+  margin: 0 auto;
+  color: rgba(230, 242, 250, 0.76);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.portal-choice-actions {
+  width: min(30rem, 100%);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.portal-choice-button {
+  min-height: 4.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--portal-border);
+  border-radius: var(--portal-radius);
+  color: var(--portal-text);
+  background:
+    linear-gradient(145deg, rgba(13, 26, 40, 0.88), rgba(5, 12, 22, 0.72)),
+    radial-gradient(circle at 18% 16%, rgba(66, 245, 215, 0.14), transparent 12rem);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-size: 1.05rem;
+  font-weight: 950;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.portal-choice-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(66, 245, 215, 0.38);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.42),
+    0 0 34px rgba(66, 245, 215, 0.12);
+}
+
+.portal-choice-button svg {
+  color: var(--portal-cyan);
+  flex-shrink: 0;
+}
+
+.portal-choice-button-site {
+  border-color: rgba(246, 207, 117, 0.23);
+  background:
+    linear-gradient(145deg, rgba(26, 25, 18, 0.78), rgba(5, 12, 22, 0.72)),
+    radial-gradient(circle at 18% 16%, rgba(246, 207, 117, 0.15), transparent 12rem);
+}
+
+.portal-choice-button-site svg {
+  color: var(--portal-gold);
+}
+
 .portal-seal,
 .portal-admin-badge,
 .portal-admin-chip {
@@ -1508,6 +1596,12 @@ textarea::placeholder {
   font-size: 1rem;
 }
 
+.portal-stat-subvalue {
+  color: rgba(66, 245, 215, 0.78);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
 .portal-reward-history {
   display: grid;
   gap: 0.55rem;
@@ -1520,7 +1614,7 @@ textarea::placeholder {
 
 .portal-reward-history article {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
   gap: 0.55rem;
   padding: 0.7rem;
@@ -1538,6 +1632,12 @@ textarea::placeholder {
   color: #fff3c7;
 }
 
+.portal-reward-history article small {
+  color: rgba(66, 245, 215, 0.75);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .portal-reward-history p,
 .portal-details-note {
   margin: 0;
@@ -1551,6 +1651,24 @@ textarea::placeholder {
   border-radius: var(--portal-radius);
   color: #fff3c7;
   background: rgba(246, 207, 117, 0.08);
+}
+
+.portal-profit-button {
+  margin-top: 0.15rem;
+}
+
+.portal-profit-message {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(66, 245, 215, 0.24);
+  border-radius: var(--portal-radius);
+  color: #d9fff8;
+  background:
+    linear-gradient(135deg, rgba(66, 245, 215, 0.1), rgba(246, 207, 117, 0.06)),
+    rgba(255, 255, 255, 0.035);
+  line-height: 1.7;
+  text-align: center;
+  animation: portalFadeUp 220ms ease both;
 }
 
 .portal-reward-field {
@@ -1988,6 +2106,31 @@ textarea::placeholder {
     gap: 0.9rem;
   }
 
+  .portal-entry-choice {
+    width: 100%;
+    gap: 0.95rem;
+  }
+
+  .portal-choice-copy h1 {
+    font-size: clamp(2.05rem, 12vw, 3rem);
+  }
+
+  .portal-choice-copy p {
+    font-size: 0.95rem;
+    line-height: 1.75;
+  }
+
+  .portal-choice-actions {
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .portal-choice-button {
+    min-height: 4.25rem;
+    padding: 0.9rem;
+    font-size: 1rem;
+  }
+
   .portal-copy h1 {
     font-size: clamp(2rem, 11vw, 3.35rem);
     line-height: 1.16;
@@ -2233,12 +2376,14 @@ textarea::placeholder {
   .portal-ring,
   .portal-scanline,
   .portal-gate,
+  .portal-entry-choice,
   .portal-code-card,
   .portal-chat-shell,
   .portal-admin-shell,
   .portal-message,
   .portal-error,
-  .portal-media-menu {
+  .portal-media-menu,
+  .portal-profit-message {
     animation: none;
   }
 }
@@ -2520,6 +2665,11 @@ label {
   border: 1px solid rgba(247, 201, 72, 0.22);
   border-radius: 999px;
   font-weight: 900;
+}
+
+.user-pill span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .page-stack {

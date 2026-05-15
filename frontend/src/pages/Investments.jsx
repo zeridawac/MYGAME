@@ -21,6 +21,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import Loading from '../components/Loading.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { formatCoinDh } from '../utils/coins.js';
 
 const Investments = () => {
   const [assets, setAssets] = useState([]);
@@ -137,7 +138,7 @@ const Investments = () => {
           <div className="portfolio-total">
             <span>القيمة الحالية</span>
             <strong>{portfolio.totalValue || 0} عملة</strong>
-            <small>رصيدك المتاح: {Math.round(user?.coins || 0)} عملة</small>
+            <small>رصيدك المتاح: {formatCoinDh(user?.coins || 0)}</small>
           </div>
           {portfolio.positions?.length ? (
             <div className="mini-list">

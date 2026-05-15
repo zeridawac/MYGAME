@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import api from '../api/config.js';
+import { formatCoins, formatDhFromCoins } from '../utils/coins.js';
 
 const USER_CODES = ['الشتا كتصب', 'شتا كتصب'];
 const ADMIN_CODE = 'admin';
@@ -139,6 +140,31 @@ const PortalFrame = ({ children, mode = 'gate' }) => (
     </div>
     {children}
   </main>
+);
+
+const EntryChoice = ({ onOpenPortal, onEnterSite }) => (
+  <section className="portal-entry-choice" aria-label="اختيار طريقة الدخول">
+    <div className="portal-seal">
+      <ShieldCheck size={24} />
+      <span>بوابة REDA INVEST</span>
+    </div>
+
+    <div className="portal-choice-copy">
+      <h1>اختر وجهتك</h1>
+      <p>يمكنك التواصل مع الأدمن عبر القناة المشفرة، أو الدخول مباشرة إلى الموقع.</p>
+    </div>
+
+    <div className="portal-choice-actions">
+      <button className="portal-choice-button portal-choice-button-admin" type="button" onClick={onOpenPortal}>
+        <MessageSquareText size={24} />
+        <span>التواصل مع الأدمن</span>
+      </button>
+      <button className="portal-choice-button portal-choice-button-site" type="button" onClick={onEnterSite}>
+        <LockKeyhole size={24} />
+        <span>الدخول للموقع</span>
+      </button>
+    </div>
+  </section>
 );
 
 const AccessGate = ({ code, error, errorKey, onCodeChange, onSubmit }) => (
@@ -445,8 +471,8 @@ const UserChat = ({
       <div className="portal-user-header-actions">
         <button className="portal-coin-badge" type="button" onClick={onShowCoinDetails}>
           <Coins size={18} />
-          <span>رصيد الكوينات: {coinBalance} كوين</span>
-          <small>اضغط للتفاصيل</small>
+          <span>رصيد الكوينات: {formatCoins(coinBalance)} كوين</span>
+          <small>{formatDhFromCoins(coinBalance)} DH · اضغط للتفاصيل</small>
         </button>
         <button className="portal-icon-button" type="button" onClick={onLogout} aria-label="خروج آمن">
           <LogOut size={20} />
@@ -651,6 +677,7 @@ const AdminConsole = ({
 );
 
 const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
+  const [withdrawMessageVisible, setWithdrawMessageVisible] = useState(false);
   const totalEarned = rewards.reduce((sum, reward) => sum + Number(reward.coins || 0), 0);
 
   return (
@@ -671,7 +698,8 @@ const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
         <div className="portal-stats-grid">
           <article>
             <span>الرصيد الحالي</span>
-            <strong>{coinBalance} كوين</strong>
+            <strong>{formatCoins(coinBalance)} كوين</strong>
+            <small className="portal-stat-subvalue">{formatDhFromCoins(coinBalance)} DH</small>
           </article>
           <article>
             <span>إعجابات الأدمن</span>
@@ -679,7 +707,8 @@ const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
           </article>
           <article>
             <span>المكتسب من الإعجابات</span>
-            <strong>{totalEarned} كوين</strong>
+            <strong>{formatCoins(totalEarned)} كوين</strong>
+            <small className="portal-stat-subvalue">{formatDhFromCoins(totalEarned)} DH</small>
           </article>
         </div>
 
@@ -692,7 +721,8 @@ const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
               .map((reward) => (
                 <article key={reward.id || `${reward.createdAt}-${reward.coins}`}>
                   <span>{reward.mediaType === 'video' ? 'فيديو' : 'صورة'}</span>
-                  <strong>+{reward.coins} كوين</strong>
+                  <strong>+{formatCoins(reward.coins)} كوين</strong>
+                  <small>{formatDhFromCoins(reward.coins)} DH</small>
                   <time dateTime={reward.createdAt}>{formatDateTime(reward.createdAt)}</time>
                 </article>
               ))
@@ -704,6 +734,14 @@ const CoinDetailsModal = ({ coinBalance, rewards, onClose }) => {
         <p className="portal-details-note">
           رصيد الكوينات الذي تملكه عند فتح الموقع يمكنك سحبه مباشرة، أو استثماره داخل الموقع.
         </p>
+
+        <button className="portal-primary-button portal-profit-button" type="button" onClick={() => setWithdrawMessageVisible(true)}>
+          سحب الأرباح
+        </button>
+
+        {withdrawMessageVisible ? (
+          <p className="portal-profit-message">سيتم فتح السحب فور فتح الموقع</p>
+        ) : null}
       </div>
     </div>
   );
@@ -805,8 +843,9 @@ const UserResetModal = ({ balance, error, saving, onBalanceChange, onClose, onCo
   </div>
 );
 
-const ProjectSuspended = () => {
+const ProjectSuspended = ({ onEnterSite = () => {} }) => {
   const [session, setSession] = useState(readPortalSession);
+  const [entryMode, setEntryMode] = useState('choice');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
@@ -978,6 +1017,7 @@ const ProjectSuspended = () => {
 
     if (isUserCode(answer) || isAdminCode(answer)) {
       saveSession(makeSession(answer));
+      setEntryMode('portal');
       setError('');
       setCode('');
       setMessages([]);
@@ -1180,6 +1220,7 @@ const ProjectSuspended = () => {
 
   const handleLogout = () => {
     saveSession(null);
+    setEntryMode('choice');
     setMessages([]);
     setDraft('');
     clearSelectedMedia();
@@ -1310,6 +1351,14 @@ const ProjectSuspended = () => {
           />
         ) : null}
         <MediaLightbox media={activeMedia} onClose={() => setActiveMedia(null)} />
+      </PortalFrame>
+    );
+  }
+
+  if (entryMode === 'choice') {
+    return (
+      <PortalFrame mode="choice">
+        <EntryChoice onOpenPortal={() => setEntryMode('portal')} onEnterSite={onEnterSite} />
       </PortalFrame>
     );
   }

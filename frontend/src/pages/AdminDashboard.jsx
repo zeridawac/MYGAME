@@ -55,7 +55,6 @@ const AdminDashboard = () => {
   const [submissions, setSubmissions] = useState([]);
   const [gameConfigs, setGameConfigs] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [coinRate, setCoinRate] = useState({ coinsPerDollar: 1000 });
   const [inviteForm, setInviteForm] = useState({ code: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
   const [couponForm, setCouponForm] = useState({
@@ -109,7 +108,6 @@ const AdminDashboard = () => {
         couponsRes,
         tasksRes,
         submissionsRes,
-        coinRateRes,
         gameConfigsRes,
         activityRes,
       ] = await Promise.all([
@@ -121,7 +119,6 @@ const AdminDashboard = () => {
         api.get('/admin/coupons'),
         api.get('/admin/tasks'),
         api.get('/admin/task-submissions'),
-        api.get('/admin/settings/coin-rate'),
         api.get('/admin/game-configs'),
         api.get('/admin/activity'),
       ]);
@@ -134,7 +131,6 @@ const AdminDashboard = () => {
       setCoupons(couponsRes.data.coupons);
       setTasks(tasksRes.data.tasks);
       setSubmissions(submissionsRes.data.submissions);
-      setCoinRate(coinRateRes.data.coinRate);
       setGameConfigs(gameConfigsRes.data.gameConfigs);
       setActivity(activityRes.data.activity);
     } catch (error) {
@@ -308,17 +304,6 @@ const AdminDashboard = () => {
       setSubmissions((current) =>
         current.map((item) => (item._id === submissionId ? data.submission : item))
       );
-      showToast(data.message, 'success');
-    } catch (error) {
-      showToast(error.message, 'error');
-    }
-  };
-
-  const updateCoinRate = async (event) => {
-    event.preventDefault();
-    try {
-      const { data } = await api.patch('/admin/settings/coin-rate', coinRate);
-      setCoinRate(data.coinRate);
       showToast(data.message, 'success');
     } catch (error) {
       showToast(error.message, 'error');
@@ -850,24 +835,12 @@ const AdminDashboard = () => {
         ) : null}
 
         {activeTab === 'settings' ? (
-          <form className="stack-form admin-form settings-form" onSubmit={updateCoinRate}>
-            <h3>قيمة العملات</h3>
-            <label>
-              <span>عدد العملات مقابل 1 دولار</span>
-              <input
-                type="number"
-                min="1"
-                value={coinRate.coinsPerDollar}
-                onChange={(event) => setCoinRate({ coinsPerDollar: event.target.value })}
-                required
-              />
-            </label>
-            <p className="helper-text">مثال: 600 عملة = ${(600 / Number(coinRate.coinsPerDollar || 1000)).toFixed(2)}</p>
-            <button className="primary-button" type="submit">
-              <Save size={18} />
-              <span>حفظ التحويل</span>
-            </button>
-          </form>
+          <section className="stack-form admin-form settings-form">
+            <h3>قيمة الكوينات بالدرهم</h3>
+            <p className="helper-text">التحويل المعروض حاليا ثابت: 1000 كوين = 100 DH.</p>
+            <p className="helper-text">مثال: 600 كوين = 60 DH.</p>
+            <p className="helper-text">هذه قيمة عرض فقط ولا تغير رصيد أي مستخدم في قاعدة البيانات.</p>
+          </section>
         ) : null}
 
         {activeTab === 'activity' ? (
