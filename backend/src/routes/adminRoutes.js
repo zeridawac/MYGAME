@@ -27,9 +27,41 @@ const {
   updateGameConfig,
   listActivity,
 } = require('../controllers/adminController');
+const {
+  deleteAllPortalChatUploads,
+  deletePortalChatUpload,
+  listPortalChatUploads,
+} = require('../controllers/adminUploadController');
 const { protect, adminOnly } = require('../middleware/auth');
 
 const router = express.Router();
+const PORTAL_ADMIN_CODE = 'admin';
+
+const normalizePortalCode = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+
+const portalUploadAdminOnly = (req, res, next) => {
+  const portalCode = normalizePortalCode(req.get('x-portal-code') || req.body?.code || req.query?.code);
+
+  if (portalCode.toLowerCase() === PORTAL_ADMIN_CODE) {
+    return next();
+  }
+
+  return protect(req, res, (error) => {
+    if (error) {
+      return next(error);
+    }
+
+    try {
+      return adminOnly(req, res, next);
+    } catch (adminError) {
+      return next(adminError);
+    }
+  });
+};
+
+router.get('/uploads/portal-chat', portalUploadAdminOnly, listPortalChatUploads);
+router.delete('/uploads/portal-chat/:filename', portalUploadAdminOnly, deletePortalChatUpload);
+router.delete('/uploads/portal-chat', portalUploadAdminOnly, deleteAllPortalChatUploads);
 
 router.use(protect, adminOnly);
 

@@ -12,7 +12,7 @@ const MAX_MESSAGES = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const UPLOAD_PUBLIC_BASE = '/uploads/portal-chat';
-const UPLOAD_ROOT = path.resolve(__dirname, '..', '..', 'uploads', 'portal-chat');
+const UPLOAD_ROOT = path.join(process.cwd(), 'uploads', 'portal-chat');
 const MEDIA_TYPES = {
   'image/jpeg': 'image',
   'image/png': 'image',

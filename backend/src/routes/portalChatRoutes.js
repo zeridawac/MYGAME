@@ -14,7 +14,7 @@ const {
 } = require('../controllers/portalChatController');
 
 const router = express.Router();
-const uploadDir = path.resolve(__dirname, '..', '..', 'uploads', 'portal-chat');
+const uploadDir = path.join(process.cwd(), 'uploads', 'portal-chat');
 
 fs.mkdirSync(uploadDir, { recursive: true });
 console.log(`[portal-chat upload] directory ready: ${uploadDir}`);

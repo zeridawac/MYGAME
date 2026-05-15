@@ -1678,6 +1678,139 @@ textarea::placeholder {
   flex-direction: column;
 }
 
+.portal-upload-manager {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--portal-line);
+  background:
+    linear-gradient(135deg, rgba(66, 245, 215, 0.07), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.025);
+}
+
+.portal-upload-manager-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.portal-upload-manager-head h3,
+.portal-upload-manager-head span {
+  margin: 0;
+}
+
+.portal-upload-manager-head span {
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.portal-upload-manager-head h3 {
+  margin-top: 0.1rem;
+  font-size: 1rem;
+}
+
+.portal-upload-manager-head > div:last-child,
+.portal-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.portal-upload-manager .portal-ghost-button,
+.portal-upload-manager .portal-danger-button {
+  min-height: 2.25rem;
+  padding: 0 0.65rem;
+  font-size: 0.78rem;
+}
+
+.portal-upload-list {
+  max-height: 15.5rem;
+  display: grid;
+  gap: 0.55rem;
+  overflow-y: auto;
+  padding-inline-end: 0.2rem;
+}
+
+.portal-upload-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--portal-radius);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.portal-upload-preview {
+  position: relative;
+  width: 4.2rem;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(66, 245, 215, 0.16);
+  border-radius: 8px;
+  color: var(--portal-cyan);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.portal-upload-preview img,
+.portal-upload-preview video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.portal-upload-preview .portal-play-badge {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.portal-upload-info {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.portal-upload-info strong,
+.portal-upload-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-upload-info strong {
+  color: #eafffb;
+  font-size: 0.88rem;
+}
+
+.portal-upload-info span {
+  color: var(--portal-muted);
+  font-size: 0.74rem;
+}
+
+.portal-upload-empty {
+  min-height: 5rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.45rem;
+  border: 1px dashed rgba(255, 255, 255, 0.13);
+  border-radius: var(--portal-radius);
+  color: var(--portal-muted);
+  text-align: center;
+}
+
+.portal-upload-empty p {
+  margin: 0;
+}
+
 .portal-single-room-layout {
   flex: 1;
   min-height: 0;
@@ -2046,6 +2179,32 @@ textarea::placeholder {
   .portal-admin-layout {
     gap: 0.6rem;
     padding: 0.6rem;
+  }
+
+  .portal-upload-manager {
+    padding: 0.65rem;
+  }
+
+  .portal-upload-manager-head,
+  .portal-upload-item {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .portal-upload-manager-head > div:last-child,
+  .portal-upload-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .portal-upload-preview {
+    width: min(8.5rem, 100%);
+    justify-self: center;
+  }
+
+  .portal-upload-info {
+    text-align: center;
   }
 
   .portal-admin-actions {

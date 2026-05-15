@@ -105,6 +105,20 @@ const formatDateTime = (value) => {
   }).format(new Date(value));
 };
 
+const formatFileSize = (bytes = 0) => {
+  const size = Number(bytes || 0);
+
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (size >= 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+
+  return `${size} B`;
+};
+
 const makeSession = (answer) => {
   const code = normalizeAnswer(answer);
   return {
@@ -456,6 +470,83 @@ const UserChat = ({
   </section>
 );
 
+const UploadManager = ({ files, loading, error, onRefresh, onPreview, onDeleteFile, onDeleteAll }) => (
+  <section className="portal-upload-manager" aria-label="إدارة ملفات الشات">
+    <header className="portal-upload-manager-head">
+      <div>
+        <span>ملفات الشات</span>
+        <h3>الوسائط المرفوعة</h3>
+      </div>
+
+      <div>
+        <button className="portal-ghost-button" type="button" onClick={onRefresh} disabled={loading}>
+          <RefreshCw size={16} />
+          <span>تحديث</span>
+        </button>
+        <button className="portal-danger-button" type="button" onClick={onDeleteAll} disabled={loading || !files.length}>
+          <Trash2 size={16} />
+          <span>حذف الكل</span>
+        </button>
+      </div>
+    </header>
+
+    {error ? <p className="portal-chat-error">{error}</p> : null}
+
+    <div className="portal-upload-list">
+      {files.length ? (
+        files.map((file) => {
+          const canPreview = file.type === 'image' || file.type === 'video';
+          const fileUrl = getAssetUrl(file.url);
+
+          return (
+            <article className="portal-upload-item" key={file.name}>
+              <button
+                className={`portal-upload-preview portal-upload-preview-${file.type}`}
+                type="button"
+                onClick={() => canPreview && onPreview({ url: fileUrl, name: file.name, type: file.type })}
+                disabled={!canPreview}
+                aria-label={`فتح ${file.name}`}
+              >
+                {file.type === 'video' ? (
+                  <>
+                    <video src={fileUrl} preload="metadata" muted playsInline />
+                    <span className="portal-play-badge">
+                      <Play size={18} fill="currentColor" />
+                    </span>
+                  </>
+                ) : file.type === 'image' ? (
+                  <img src={fileUrl} alt={file.name} />
+                ) : (
+                  <UploadCloud size={22} />
+                )}
+              </button>
+
+              <div className="portal-upload-info">
+                <strong title={file.name}>{file.name}</strong>
+                <span>{formatFileSize(file.size)} · {formatDateTime(file.uploadedAt)}</span>
+              </div>
+
+              <div className="portal-upload-actions">
+                <button className="portal-ghost-button" type="button" onClick={() => onPreview({ url: fileUrl, name: file.name, type: file.type })} disabled={!canPreview}>
+                  فتح
+                </button>
+                <button className="portal-danger-button" type="button" onClick={() => onDeleteFile(file.name)}>
+                  حذف
+                </button>
+              </div>
+            </article>
+          );
+        })
+      ) : (
+        <div className="portal-upload-empty">
+          <UploadCloud size={24} />
+          <p>{loading ? 'جاري تحميل الملفات...' : 'لا توجد ملفات مرفوعة داخل portal-chat الآن.'}</p>
+        </div>
+      )}
+    </div>
+  </section>
+);
+
 const AdminConsole = ({
   messages,
   draft,
@@ -476,6 +567,13 @@ const AdminConsole = ({
   onRefresh,
   onResetCoins,
   resettingCoins,
+  uploadFiles,
+  uploadsLoading,
+  uploadsError,
+  onRefreshUploads,
+  onPreviewUpload,
+  onDeleteUpload,
+  onDeleteAllUploads,
   endRef,
 }) => (
   <section className="portal-admin-shell portal-single-room-shell">
@@ -507,6 +605,16 @@ const AdminConsole = ({
 
     <div className="portal-single-room-layout">
       <div className="portal-admin-chat portal-admin-chat-single">
+        <UploadManager
+          files={uploadFiles}
+          loading={uploadsLoading}
+          error={uploadsError}
+          onRefresh={onRefreshUploads}
+          onPreview={onPreviewUpload}
+          onDeleteFile={onDeleteUpload}
+          onDeleteAll={onDeleteAllUploads}
+        />
+
         <header className="portal-chat-header portal-chat-header-admin">
           <div>
             <span className="portal-status-dot" />
@@ -722,11 +830,23 @@ const ProjectSuspended = () => {
   const [userResetBalance, setUserResetBalance] = useState(String(DEFAULT_COIN_BALANCE));
   const [userResetError, setUserResetError] = useState('');
   const [resettingUser, setResettingUser] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  const [uploadsLoading, setUploadsLoading] = useState(false);
+  const [uploadsError, setUploadsError] = useState('');
   const endRef = useRef(null);
 
   const chatUrl = useCallback(() => {
     return `/portal-chat?code=${encodeURIComponent(session?.code || '')}`;
   }, [session?.code]);
+
+  const adminUploadRequestConfig = useCallback(
+    () => ({
+      headers: {
+        'x-portal-code': session?.code || '',
+      },
+    }),
+    [session?.code]
+  );
 
   const saveSession = (nextSession) => {
     setSession(nextSession);
@@ -834,6 +954,24 @@ const ProjectSuspended = () => {
     [applyRoomData, chatUrl, markAdminMessagesRead, session?.code]
   );
 
+  const fetchUploads = useCallback(async () => {
+    if (session?.mode !== 'admin') {
+      return;
+    }
+
+    setUploadsLoading(true);
+
+    try {
+      const { data } = await api.get('/admin/uploads/portal-chat', adminUploadRequestConfig());
+      setUploadFiles(data.files || []);
+      setUploadsError('');
+    } catch (requestError) {
+      setUploadsError(requestError.message || 'تعذر تحميل ملفات الشات.');
+    } finally {
+      setUploadsLoading(false);
+    }
+  }, [adminUploadRequestConfig, session?.mode]);
+
   const handleUnlock = (event) => {
     event.preventDefault();
     const answer = normalizeAnswer(code);
@@ -882,10 +1020,61 @@ const ProjectSuspended = () => {
       setDraft('');
       clearSelectedMedia();
       setChatError('');
+      if (session.mode === 'admin' && media) {
+        fetchUploads();
+      }
     } catch (requestError) {
       setChatError(requestError.message || 'تعذر إرسال الرسالة.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handlePreviewUpload = (file) => {
+    if (!file?.url || !['image', 'video'].includes(file.type)) {
+      return;
+    }
+
+    setActiveMedia(file);
+  };
+
+  const handleDeleteUpload = async (filename) => {
+    const confirmed = window.confirm(`هل تريد حذف الملف "${filename}"؟ لن يتم حذف رسائل الشات.`);
+
+    if (!confirmed || session?.mode !== 'admin') {
+      return;
+    }
+
+    setUploadsLoading(true);
+
+    try {
+      await api.delete(`/admin/uploads/portal-chat/${encodeURIComponent(filename)}`, adminUploadRequestConfig());
+      await fetchUploads();
+      setUploadsError('');
+    } catch (requestError) {
+      setUploadsError(requestError.message || 'تعذر حذف الملف.');
+    } finally {
+      setUploadsLoading(false);
+    }
+  };
+
+  const handleDeleteAllUploads = async () => {
+    const confirmed = window.confirm('هل تريد حذف جميع ملفات portal-chat؟ لن يتم حذف رسائل الشات.');
+
+    if (!confirmed || session?.mode !== 'admin') {
+      return;
+    }
+
+    setUploadsLoading(true);
+
+    try {
+      await api.delete('/admin/uploads/portal-chat', adminUploadRequestConfig());
+      setUploadFiles([]);
+      setUploadsError('');
+    } catch (requestError) {
+      setUploadsError(requestError.message || 'تعذر حذف جميع الملفات.');
+    } finally {
+      setUploadsLoading(false);
     }
   };
 
@@ -999,6 +1188,8 @@ const ProjectSuspended = () => {
     setRewardTarget(null);
     setUserResetOpen(false);
     setUserResetError('');
+    setUploadFiles([]);
+    setUploadsError('');
     setRewardHistory([]);
     setCoinBalance(DEFAULT_COIN_BALANCE);
     setChatError('');
@@ -1016,6 +1207,12 @@ const ProjectSuspended = () => {
 
     return () => window.clearInterval(intervalId);
   }, [fetchMessages, session?.code]);
+
+  useEffect(() => {
+    if (session?.mode === 'admin') {
+      fetchUploads();
+    }
+  }, [fetchUploads, session?.mode]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1078,9 +1275,19 @@ const ProjectSuspended = () => {
           onSend={handleSend}
           onClearMessages={handleClearMessages}
           onLogout={handleLogout}
-          onRefresh={() => fetchMessages()}
+          onRefresh={() => {
+            fetchMessages();
+            fetchUploads();
+          }}
           onResetCoins={openUserResetModal}
           resettingCoins={resettingUser}
+          uploadFiles={uploadFiles}
+          uploadsLoading={uploadsLoading}
+          uploadsError={uploadsError}
+          onRefreshUploads={fetchUploads}
+          onPreviewUpload={handlePreviewUpload}
+          onDeleteUpload={handleDeleteUpload}
+          onDeleteAllUploads={handleDeleteAllUploads}
           endRef={endRef}
         />
         <RewardModal

@@ -18,7 +18,7 @@ const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
-const uploadsStaticRoot = path.resolve(__dirname, '..', 'uploads');
+const uploadsStaticRoot = path.join(process.cwd(), 'uploads');
 
 app.use(
   cors({
