@@ -10,6 +10,14 @@ const ADMIN_CODE = 'admin';
 const MAX_MESSAGES = 500;
 const UPLOAD_PUBLIC_BASE = '/uploads/portal-chat';
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads', 'portal-chat');
+const MEDIA_TYPES = {
+  'image/jpeg': 'image',
+  'image/png': 'image',
+  'image/webp': 'image',
+  'video/mp4': 'video',
+  'video/webm': 'video',
+  'video/quicktime': 'video',
+};
 
 const normalizeCode = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 
@@ -37,13 +45,36 @@ const presentMessage = (message) => ({
   imageName: message.imageName,
   imageMime: message.imageMime,
   imageSize: message.imageSize,
+  mediaUrl: message.mediaUrl || message.imageUrl,
+  mediaName: message.mediaName || message.imageName,
+  mediaMime: message.mediaMime || message.imageMime,
+  mediaSize: message.mediaSize || message.imageSize,
+  mediaType: message.mediaType || (message.imageUrl ? 'image' : ''),
   readByUserAt: message.readByUserAt,
   createdAt: message.createdAt,
 });
 
-const removeUploadedImages = async (messages) => {
+const getMediaType = (mimeType = '', fallbackUrl = '') => {
+  if (MEDIA_TYPES[mimeType]) {
+    return MEDIA_TYPES[mimeType];
+  }
+
+  const extension = path.extname(fallbackUrl).toLowerCase();
+
+  if (['.jpg', '.jpeg', '.png', '.webp'].includes(extension)) {
+    return 'image';
+  }
+
+  if (['.mp4', '.webm', '.mov'].includes(extension)) {
+    return 'video';
+  }
+
+  return '';
+};
+
+const removeUploadedMedia = async (messages) => {
   const paths = messages
-    .map((message) => message.imagePath)
+    .flatMap((message) => [message.mediaPath, message.imagePath])
     .filter(Boolean)
     .map((filePath) => path.resolve(filePath))
     .filter((filePath) => filePath.startsWith(path.resolve(UPLOAD_ROOT)));
@@ -54,7 +85,7 @@ const removeUploadedImages = async (messages) => {
         await fs.unlink(filePath);
       } catch (error) {
         if (error.code !== 'ENOENT') {
-          console.warn(`Failed to remove portal image: ${filePath}`);
+          console.warn(`Failed to remove portal media: ${filePath}`);
         }
       }
     })
@@ -88,11 +119,13 @@ const listPortalMessages = asyncHandler(async (req, res) => {
 const createPortalMessage = asyncHandler(async (req, res) => {
   const sender = getPortalRole(req);
   const text = String(req.body?.text || '').trim();
-  const image = req.body?.image || {};
-  const imageUrl = String(image.url || '').trim();
-  const hasImage = Boolean(imageUrl);
+  const media = req.body?.media || req.body?.image || {};
+  const mediaUrl = String(media.url || '').trim();
+  const hasMedia = Boolean(mediaUrl);
+  const mediaMime = String(media.mimeType || '').slice(0, 80);
+  const mediaType = getMediaType(mediaMime, mediaUrl);
 
-  if (!text && !hasImage) {
+  if (!text && !hasMedia) {
     res.status(400);
     throw new Error('الرسالة لا يمكن أن تكون فارغة');
   }
@@ -102,28 +135,40 @@ const createPortalMessage = asyncHandler(async (req, res) => {
     throw new Error('الرسالة طويلة جدا');
   }
 
-  if (hasImage && !imageUrl.startsWith(`${UPLOAD_PUBLIC_BASE}/`)) {
+  if (hasMedia && !mediaUrl.startsWith(`${UPLOAD_PUBLIC_BASE}/`)) {
     res.status(400);
-    throw new Error('رابط الصورة غير صالح');
+    throw new Error('رابط الوسائط غير صالح');
   }
 
-  const imageFileName = hasImage ? path.basename(imageUrl) : '';
+  if (hasMedia && !mediaType) {
+    res.status(400);
+    throw new Error('نوع الوسائط غير مدعوم');
+  }
+
+  const mediaFileName = hasMedia ? path.basename(mediaUrl) : '';
+  const mediaPath = hasMedia ? path.join(UPLOAD_ROOT, mediaFileName) : '';
 
   const room = await getSharedRoom();
   room.messages.push({
     sender,
     text,
-    imageUrl,
-    imageName: String(image.name || '').slice(0, 180),
-    imageMime: String(image.mimeType || '').slice(0, 80),
-    imageSize: Number(image.size || 0),
-    imagePath: hasImage ? path.join(UPLOAD_ROOT, imageFileName) : '',
+    imageUrl: mediaType === 'image' ? mediaUrl : '',
+    imageName: mediaType === 'image' ? String(media.name || '').slice(0, 180) : '',
+    imageMime: mediaType === 'image' ? mediaMime : '',
+    imageSize: mediaType === 'image' ? Number(media.size || 0) : 0,
+    imagePath: mediaType === 'image' ? mediaPath : '',
+    mediaUrl,
+    mediaName: String(media.name || '').slice(0, 180),
+    mediaMime,
+    mediaSize: Number(media.size || 0),
+    mediaPath,
+    mediaType,
     readByUserAt: null,
     createdAt: new Date(),
   });
 
   if (room.messages.length > MAX_MESSAGES) {
-    await removeUploadedImages(room.messages.slice(0, room.messages.length - MAX_MESSAGES));
+    await removeUploadedMedia(room.messages.slice(0, room.messages.length - MAX_MESSAGES));
     room.messages = room.messages.slice(room.messages.length - MAX_MESSAGES);
   }
 
@@ -131,7 +176,7 @@ const createPortalMessage = asyncHandler(async (req, res) => {
   sendRoom(res, room);
 });
 
-const uploadPortalImage = asyncHandler(async (req, res) => {
+const uploadPortalMedia = asyncHandler(async (req, res) => {
   try {
     getPortalRole(req);
   } catch (error) {
@@ -144,16 +189,25 @@ const uploadPortalImage = asyncHandler(async (req, res) => {
 
   if (!req.file) {
     res.status(400);
-    throw new Error('يجب اختيار صورة');
+    throw new Error('يجب اختيار صورة أو فيديو');
+  }
+
+  const mediaType = getMediaType(req.file.mimetype, req.file.filename);
+
+  if (!mediaType) {
+    await fs.unlink(req.file.path).catch(() => {});
+    res.status(400);
+    throw new Error('نوع الوسائط غير مدعوم');
   }
 
   res.status(201).json({
     success: true,
-    image: {
+    media: {
       url: `${UPLOAD_PUBLIC_BASE}/${req.file.filename}`,
       name: req.file.originalname,
       mimeType: req.file.mimetype,
       size: req.file.size,
+      type: mediaType,
       path: req.file.path,
     },
   });
@@ -194,7 +248,7 @@ const clearPortalMessages = asyncHandler(async (req, res) => {
   }
 
   const room = await getSharedRoom();
-  await removeUploadedImages(room.messages);
+  await removeUploadedMedia(room.messages);
   room.messages = [];
   room.lastClearedAt = new Date();
   await room.save();
@@ -205,7 +259,7 @@ const clearPortalMessages = asyncHandler(async (req, res) => {
 module.exports = {
   listPortalMessages,
   createPortalMessage,
-  uploadPortalImage,
+  uploadPortalMedia,
   markAdminMessagesRead,
   clearPortalMessages,
 };

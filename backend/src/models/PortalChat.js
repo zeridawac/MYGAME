@@ -33,6 +33,31 @@ const portalMessageSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    mediaUrl: {
+      type: String,
+      default: '',
+    },
+    mediaName: {
+      type: String,
+      default: '',
+    },
+    mediaMime: {
+      type: String,
+      default: '',
+    },
+    mediaSize: {
+      type: Number,
+      default: 0,
+    },
+    mediaPath: {
+      type: String,
+      default: '',
+    },
+    mediaType: {
+      type: String,
+      enum: ['', 'image', 'video'],
+      default: '',
+    },
     readByUserAt: {
       type: Date,
       default: null,

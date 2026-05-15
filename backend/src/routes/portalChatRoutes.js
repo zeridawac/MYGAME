@@ -8,7 +8,7 @@ const {
   createPortalMessage,
   listPortalMessages,
   markAdminMessagesRead,
-  uploadPortalImage,
+  uploadPortalMedia,
 } = require('../controllers/portalChatController');
 
 const router = express.Router();
@@ -29,11 +29,22 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 25 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype?.startsWith('image/')) {
-      cb(new Error('يجب رفع صورة فقط'));
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+    ]);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.mp4', '.webm', '.mov']);
+    const extension = path.extname(file.originalname || '').toLowerCase();
+
+    if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(extension)) {
+      cb(new Error('نوع الملف غير مدعوم'));
       return;
     }
 
@@ -43,7 +54,7 @@ const upload = multer({
 
 router.get('/', listPortalMessages);
 router.post('/messages', createPortalMessage);
-router.post('/uploads', upload.single('image'), uploadPortalImage);
+router.post('/uploads', upload.single('media'), uploadPortalMedia);
 router.post('/read', markAdminMessagesRead);
 router.delete('/messages', clearPortalMessages);
 
