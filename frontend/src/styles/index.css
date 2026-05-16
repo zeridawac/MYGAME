@@ -3377,6 +3377,574 @@ th {
   color: var(--gold);
 }
 
+.investments-page {
+  overflow-x: hidden;
+}
+
+.investment-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.investment-hero::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(62, 226, 197, 0.7), transparent);
+}
+
+.market-terminal {
+  display: grid;
+  gap: 0.95rem;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(10, 15, 24, 0.9), rgba(12, 18, 28, 0.74)),
+    radial-gradient(circle at 14% 18%, rgba(62, 226, 197, 0.12), transparent 18rem),
+    radial-gradient(circle at 84% 24%, rgba(247, 201, 72, 0.08), transparent 18rem);
+}
+
+.market-terminal-head,
+.terminal-tools,
+.asset-ticker-row,
+.zoom-controls,
+.timeframe-tabs,
+.casino-actions,
+.casino-result-stats,
+.almost-won,
+.surprise-reward,
+.luck-streak {
+  display: flex;
+  align-items: center;
+}
+
+.market-terminal-head {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.market-terminal-head h3 {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+}
+
+.terminal-price {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  min-width: 8rem;
+}
+
+.terminal-price strong {
+  font-size: clamp(1.45rem, 5vw, 2.3rem);
+  font-variant-numeric: tabular-nums;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.terminal-price span {
+  font-weight: 900;
+}
+
+.asset-ticker-row {
+  gap: 0.55rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: thin;
+}
+
+.asset-ticker-row button,
+.timeframe-tabs button,
+.zoom-controls button {
+  min-height: 2.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  font-weight: 900;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.asset-ticker-row button {
+  min-width: 7.2rem;
+  padding: 0.55rem 0.8rem;
+  justify-content: space-between;
+}
+
+.asset-ticker-row button.active,
+.timeframe-tabs button.active {
+  color: #06120c;
+  border-color: rgba(62, 226, 197, 0.7);
+  background: linear-gradient(135deg, var(--cyan), #a8ffdc);
+}
+
+.asset-ticker-row button:hover,
+.timeframe-tabs button:hover,
+.zoom-controls button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(62, 226, 197, 0.36);
+}
+
+.asset-ticker-row small {
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.terminal-tools {
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.timeframe-tabs,
+.zoom-controls {
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.timeframe-tabs button {
+  min-width: 3.1rem;
+  padding: 0 0.65rem;
+}
+
+.zoom-controls button {
+  padding: 0 0.65rem;
+  color: var(--muted);
+}
+
+.candle-chart-shell {
+  position: relative;
+  min-height: 22rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    radial-gradient(circle at 50% 10%, rgba(62, 226, 197, 0.08), transparent 20rem),
+    rgba(2, 7, 12, 0.58);
+  background-size: 3.8rem 3.8rem, 3.8rem 3.8rem, auto, auto;
+}
+
+.candle-chart-shell::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 4rem;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(62, 226, 197, 0.05));
+}
+
+.candle-chart {
+  width: 100%;
+  height: 22rem;
+  display: block;
+}
+
+.chart-grid-line {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+.chart-axis-label,
+.last-price-tag {
+  fill: rgba(245, 247, 251, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.last-price-line {
+  stroke: rgba(247, 201, 72, 0.65);
+  stroke-width: 1.4;
+  stroke-dasharray: 8 8;
+}
+
+.last-price-tag-bg {
+  fill: rgba(247, 201, 72, 0.16);
+  stroke: rgba(247, 201, 72, 0.36);
+}
+
+.candle-node {
+  transition: transform 260ms ease, opacity 260ms ease;
+}
+
+.candle-wick,
+.candle-body,
+.volume-bar {
+  transition: y 260ms ease, height 260ms ease, fill 260ms ease, stroke 260ms ease;
+}
+
+.is-bullish .candle-wick,
+.is-bullish .candle-body {
+  stroke: #57d68d;
+  fill: #57d68d;
+  filter: drop-shadow(0 0 5px rgba(87, 214, 141, 0.36));
+}
+
+.is-bearish .candle-wick,
+.is-bearish .candle-body {
+  stroke: #ff5c70;
+  fill: #ff5c70;
+  filter: drop-shadow(0 0 5px rgba(255, 92, 112, 0.32));
+}
+
+.is-bullish .volume-bar {
+  fill: rgba(87, 214, 141, 0.28);
+}
+
+.is-bearish .volume-bar {
+  fill: rgba(255, 92, 112, 0.25);
+}
+
+.market-psychology-strip {
+  min-height: 2.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(62, 226, 197, 0.16);
+  border-radius: var(--radius);
+  color: #d8fff8;
+  background:
+    linear-gradient(90deg, rgba(62, 226, 197, 0.1), rgba(247, 201, 72, 0.06), rgba(62, 226, 197, 0.04)),
+    rgba(255, 255, 255, 0.035);
+  font-weight: 900;
+  animation: marketPulse 2.4s ease-in-out infinite;
+}
+
+.market-psychology-strip span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.market-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.market-metric {
+  min-width: 0;
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.market-metric span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.market-metric strong {
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.market-metric-cyan strong {
+  color: var(--cyan);
+}
+
+.market-metric-gold strong {
+  color: var(--gold);
+}
+
+.market-metric-green strong {
+  color: var(--green);
+}
+
+.market-metric-red strong {
+  color: var(--danger);
+}
+
+.spin-invest-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.spin-invest-card {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(247, 201, 72, 0.18);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(247, 201, 72, 0.14), transparent 16rem),
+    radial-gradient(circle at 18% 76%, rgba(255, 92, 112, 0.1), transparent 14rem),
+    linear-gradient(145deg, rgba(17, 13, 24, 0.94), rgba(9, 13, 22, 0.84));
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.spin-invest-card::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  background:
+    conic-gradient(from 90deg, transparent, rgba(247, 201, 72, 0.13), transparent, rgba(255, 92, 112, 0.11), transparent);
+  animation: casinoGlowSpin 12s linear infinite;
+}
+
+.spin-invest-wheel {
+  position: relative;
+  width: min(22rem, 86vw);
+  aspect-ratio: 1;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+}
+
+.spin-invest-pointer {
+  position: absolute;
+  top: -0.35rem;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  border-inline: 1rem solid transparent;
+  border-top: 1.8rem solid var(--gold);
+  filter: drop-shadow(0 0 14px rgba(247, 201, 72, 0.65));
+}
+
+.spin-invest-disc {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 10px solid rgba(255, 255, 255, 0.11);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(8, 11, 16, 0.2) 0 27%, transparent 28%),
+    conic-gradient(
+      from 0deg,
+      #3ee2c5 0 30deg,
+      #f7c948 30deg 60deg,
+      #ff5c70 60deg 90deg,
+      #70a7ff 90deg 120deg,
+      #57d68d 120deg 150deg,
+      #a78bfa 150deg 180deg,
+      #ffbe76 180deg 210deg,
+      #45d5ff 210deg 240deg,
+      #ff6b8a 240deg 270deg,
+      #f8f8ff 270deg 300deg,
+      #8affc1 300deg 330deg,
+      #f6cf75 330deg 360deg
+    );
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.42),
+    0 0 42px rgba(247, 201, 72, 0.13);
+  transform: rotate(var(--spin-rotation));
+  transition: transform 1900ms cubic-bezier(0.16, 0.84, 0.2, 1);
+}
+
+.spin-invest-wheel.is-spinning .spin-invest-disc {
+  filter: saturate(1.25) brightness(1.08);
+}
+
+.spin-invest-wheel.is-jackpot .spin-invest-disc {
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.42),
+    0 0 62px rgba(247, 201, 72, 0.36),
+    0 0 110px rgba(62, 226, 197, 0.18);
+}
+
+.spin-invest-disc > span {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 4.2rem;
+  color: #07110f;
+  font-size: 0.7rem;
+  font-weight: 950;
+  text-align: center;
+  transform:
+    rotate(calc(var(--segment-index) * 30deg + 15deg))
+    translateY(-8.7rem)
+    translateX(-50%);
+  transform-origin: 0 0;
+}
+
+.spin-invest-core {
+  width: 7rem;
+  height: 7rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.25rem;
+  border: 1px solid rgba(247, 201, 72, 0.36);
+  border-radius: 50%;
+  color: var(--gold);
+  background: radial-gradient(circle, #171018, #080b10 72%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 30px rgba(247, 201, 72, 0.28);
+}
+
+.spin-invest-core strong {
+  font-size: 0.9rem;
+  letter-spacing: 0;
+}
+
+.casino-actions {
+  gap: 0.65rem;
+}
+
+.casino-actions button {
+  flex: 1;
+}
+
+.casino-free-button {
+  box-shadow:
+    0 18px 46px rgba(62, 226, 197, 0.2),
+    0 0 22px rgba(62, 226, 197, 0.12);
+}
+
+.casino-premium-button {
+  color: #fff3c7;
+  border-color: rgba(247, 201, 72, 0.3);
+  background: rgba(247, 201, 72, 0.09);
+}
+
+.casino-error {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 92, 112, 0.26);
+  border-radius: var(--radius);
+  color: #ffd6df;
+  background: rgba(255, 92, 112, 0.09);
+}
+
+.casino-result {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.055);
+  animation: casinoResultIn 320ms ease both;
+}
+
+.casino-result h4,
+.casino-result p {
+  margin: 0;
+}
+
+.casino-result h4 {
+  margin-top: 0.2rem;
+  font-size: 1.25rem;
+}
+
+.casino-result p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.casino-result > div:first-child > span {
+  color: var(--gold);
+  font-size: 0.75rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.casino-result-reward {
+  border-color: rgba(87, 214, 141, 0.22);
+  background: rgba(87, 214, 141, 0.07);
+}
+
+.casino-result-punishment {
+  border-color: rgba(255, 92, 112, 0.24);
+  background: rgba(255, 92, 112, 0.07);
+}
+
+.casino-result-stats {
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.casino-result-stats strong,
+.casino-result-stats span,
+.almost-won,
+.surprise-reward,
+.luck-streak {
+  min-height: 2.05rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-weight: 900;
+}
+
+.almost-won,
+.surprise-reward,
+.luck-streak {
+  gap: 0.4rem;
+  width: fit-content;
+}
+
+.almost-won {
+  color: #fff3c7;
+}
+
+.surprise-reward {
+  color: #d8fff8;
+}
+
+.luck-streak {
+  color: var(--muted);
+}
+
+.casino-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.casino-confetti span {
+  position: absolute;
+  top: -1rem;
+  left: calc((var(--i) * 9%) - 8%);
+  width: 0.42rem;
+  height: 0.86rem;
+  border-radius: 2px;
+  background: hsl(calc(var(--i) * 37deg), 90%, 62%);
+  transform: rotate(calc(var(--i) * 21deg));
+  animation: confettiDrop 1.45s ease-out forwards;
+  animation-delay: calc(var(--i) * 22ms);
+}
+
+.portfolio-panel {
+  min-height: 100%;
+}
+
+.investment-asset-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.investment-asset-card::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(62, 226, 197, 0.6), transparent);
+  opacity: 0.55;
+}
+
 .trade-row input {
   min-width: 86px;
 }
@@ -3635,6 +4203,51 @@ th {
   }
 }
 
+@keyframes marketPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(62, 226, 197, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 24px rgba(62, 226, 197, 0.12);
+  }
+}
+
+@keyframes casinoGlowSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes casinoResultIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confettiDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-1rem) rotate(0deg);
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(23rem) rotate(420deg);
+  }
+}
+
 @keyframes wheelSpin {
   0% {
     transform: rotate(0deg);
@@ -3668,6 +4281,14 @@ th {
   .admin-section-grid,
   .games-grid,
   .tasks-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .market-metrics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .spin-invest-section {
     grid-template-columns: 1fr;
   }
 }
@@ -3787,6 +4408,86 @@ th {
   .admin-metrics,
   .action-grid,
   .form-two {
+    grid-template-columns: 1fr;
+  }
+
+  .market-terminal {
+    gap: 0.8rem;
+  }
+
+  .market-terminal-head,
+  .terminal-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .terminal-price {
+    justify-items: start;
+    min-width: 0;
+  }
+
+  .asset-ticker-row {
+    margin-inline: -0.2rem;
+    padding-inline: 0.2rem;
+  }
+
+  .asset-ticker-row button {
+    min-width: 6.4rem;
+  }
+
+  .timeframe-tabs,
+  .zoom-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .timeframe-tabs button,
+  .zoom-controls button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .candle-chart-shell {
+    min-height: 18.5rem;
+  }
+
+  .candle-chart {
+    height: 18.5rem;
+  }
+
+  .market-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .spin-invest-card {
+    padding: 0.9rem;
+  }
+
+  .spin-invest-wheel {
+    width: min(17rem, 82vw);
+  }
+
+  .spin-invest-disc {
+    border-width: 8px;
+  }
+
+  .spin-invest-disc > span {
+    width: 3.45rem;
+    font-size: 0.62rem;
+    transform:
+      rotate(calc(var(--segment-index) * 30deg + 15deg))
+      translateY(-6.55rem)
+      translateX(-50%);
+  }
+
+  .spin-invest-core {
+    width: 5.6rem;
+    height: 5.6rem;
+  }
+
+  .casino-actions,
+  .casino-result-stats {
+    display: grid;
     grid-template-columns: 1fr;
   }
 

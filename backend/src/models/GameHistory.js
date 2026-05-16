@@ -11,7 +11,7 @@ const gameHistorySchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      enum: ['spin', 'scratch', 'luckyBox', 'dailyReward'],
+      enum: ['spin', 'scratch', 'luckyBox', 'dailyReward', 'spinInvest'],
     },
     gameName: {
       type: String,
@@ -34,6 +34,10 @@ const gameHistorySchema = new mongoose.Schema(
     xp: {
       type: Number,
       default: 0,
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
   },
   { timestamps: true }

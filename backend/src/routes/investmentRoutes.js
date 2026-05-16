@@ -4,6 +4,7 @@ const {
   getPortfolio,
   buyAsset,
   sellAsset,
+  spinInvest,
 } = require('../controllers/investmentController');
 const { protect } = require('../middleware/auth');
 
@@ -13,5 +14,6 @@ router.get('/assets', protect, listAssets);
 router.get('/portfolio', protect, getPortfolio);
 router.post('/buy', protect, buyAsset);
 router.post('/sell', protect, sellAsset);
+router.post('/spin-invest', protect, spinInvest);
 
 module.exports = router;
