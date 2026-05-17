@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, PackageCheck, ShoppingBag, ShoppingCart, Sparkles } from 'lucide-react';
+import { ArrowRight, PackageCheck, ShoppingCart, Sparkles } from 'lucide-react';
 import api from '../api/config.js';
 import Loading from '../components/Loading.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCoins } from '../utils/coins.js';
@@ -16,8 +15,6 @@ const ProductDetails = () => {
   const [related, setRelated] = useState([]);
   const [activeImage, setActiveImage] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [buying, setBuying] = useState(false);
-  const { updateUser } = useAuth();
   const cart = useCart();
   const { showToast } = useToast();
 
@@ -43,22 +40,6 @@ const ProductDetails = () => {
   const addToCart = () => {
     cart.addItem(product);
     showToast('تمت إضافة المنتج للسلة', 'success');
-  };
-
-  const buyNow = async () => {
-    setBuying(true);
-    try {
-      const { data } = await api.post('/store/checkout', {
-        items: [{ productId: product.id, quantity: 1 }],
-      });
-      updateUser(data.user);
-      showToast(data.message, 'success');
-      navigate('/store');
-    } catch (error) {
-      showToast(error.message || 'رصيد الكوينات غير كاف', 'error');
-    } finally {
-      setBuying(false);
-    }
   };
 
   if (loading || !product) {
@@ -110,11 +91,7 @@ const ProductDetails = () => {
             <span>{product.stockQuantity > 0 ? `متوفر: ${product.stockQuantity}` : 'غير متوفر حاليا'}</span>
           </div>
           <div className="product-actions">
-            <button className="primary-button" type="button" onClick={buyNow} disabled={buying || product.stockQuantity <= 0}>
-              <ShoppingBag size={18} />
-              <span>{buying ? 'جاري الشراء...' : 'شراء الآن'}</span>
-            </button>
-            <button className="ghost-button" type="button" onClick={addToCart} disabled={product.stockQuantity <= 0}>
+            <button className="primary-button" type="button" onClick={addToCart} disabled={product.stockQuantity <= 0}>
               <ShoppingCart size={18} />
               <span>إضافة للسلة</span>
             </button>

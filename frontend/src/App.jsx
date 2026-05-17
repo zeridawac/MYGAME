@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import Cart from './pages/Cart.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Gifts from './pages/Gifts.jsx';
 import Investments from './pages/Investments.jsx';
@@ -42,6 +43,7 @@ const App = () => {
                 <Route path="/trading" element={<Investments />} />
                 <Route path="/store" element={<Store />} />
                 <Route path="/store/:id" element={<ProductDetails />} />
+                <Route path="/cart" element={<Cart />} />
                 <Route path="/shopping" element={<Navigate to="/store" replace />} />
                 <Route path="/investments" element={<Navigate to="/trading" replace />} />
                 <Route path="/games" element={<Navigate to="/trading" replace />} />

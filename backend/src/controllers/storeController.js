@@ -9,7 +9,9 @@ const StoreProduct = require('../models/StoreProduct');
 const STORE_UPLOAD_BASE = '/uploads/store-products';
 const STORE_UPLOAD_ROOT = path.join(process.cwd(), 'uploads', 'store-products');
 const TEMU_IMPORT_ERROR = 'تعذر جلب بيانات المنتج';
+const TEMU_PRICE_ERROR = 'تعذر استخراج سعر المنتج';
 const DH_TO_COINS = 10;
+const MIN_PRODUCT_PRICE_DH = 5;
 
 const starterProducts = [
   {
@@ -120,7 +122,9 @@ const stripTemuTitle = (value = '') =>
     .trim();
 
 const sanitizeImageUrl = (url = '') => {
-  const cleanUrl = decodeHtml(String(url).replace(/\\u002F/g, '/').replace(/\\\//g, '/')).trim();
+  const cleanUrl = decodeHtml(
+    String(url).replace(/\\u002F/g, '/').replace(/\\u0026/g, '&').replace(/\\\//g, '/')
+  ).trim();
   try {
     const parsed = new URL(cleanUrl);
     if (!['http:', 'https:'].includes(parsed.protocol)) return '';
@@ -215,6 +219,7 @@ const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source 
   if (!parsedAmount || parsedAmount <= 0 || parsedAmount > 1000000) return null;
   const normalizedCurrency = normalizeCurrency(currency);
   const dhPrice = parsedAmount * currencyToDh(normalizedCurrency);
+  if (dhPrice < MIN_PRODUCT_PRICE_DH) return null;
 
   return {
     amount: Number(parsedAmount.toFixed(2)),
@@ -228,6 +233,21 @@ const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source 
 const collectPrice = (collection, amount, currency, kind, source) => {
   const candidate = buildPriceCandidate(amount, currency, kind, source);
   if (candidate) collection.push(candidate);
+};
+
+const shouldSkipPriceContext = (context = '') =>
+  /shipping|delivery|coupon|voucher|tax|fee|threshold|minimum|ship|free|points|review|sold|rating|piece|qty/i.test(
+    context
+  );
+
+const inferVisiblePriceKind = (context = '') => {
+  if (/original|retail|list|was|before|market|strike|السعر\s*الأصلي|قبل|بدل|ancien|prix\s*initial/i.test(context)) {
+    return 'original';
+  }
+  if (/sale|now|current|discount|deal|price|السعر|خصم|حاليا|maintenant|prix/i.test(context)) {
+    return 'current';
+  }
+  return 'unknown';
 };
 
 const extractPriceCandidates = (html, jsonProduct) => {
@@ -275,14 +295,20 @@ const extractPriceCandidates = (html, jsonProduct) => {
   let match = currencyBeforePattern.exec(visibleText);
   while (match) {
     const currency = match[0].replace(match[1], '').trim();
-    collectPrice(candidates, match[1], currency, 'unknown', 'visible-text');
+    const context = visibleText.slice(Math.max(0, match.index - 90), match.index + 120);
+    if (!shouldSkipPriceContext(context)) {
+      collectPrice(candidates, match[1], currency, inferVisiblePriceKind(context), 'visible-text');
+    }
     match = currencyBeforePattern.exec(visibleText);
   }
 
   match = currencyAfterPattern.exec(visibleText);
   while (match) {
     const currency = match[0].replace(match[1], '').trim();
-    collectPrice(candidates, match[1], currency, 'unknown', 'visible-text');
+    const context = visibleText.slice(Math.max(0, match.index - 90), match.index + 120);
+    if (!shouldSkipPriceContext(context)) {
+      collectPrice(candidates, match[1], currency, inferVisiblePriceKind(context), 'visible-text');
+    }
     match = currencyAfterPattern.exec(visibleText);
   }
 
@@ -310,9 +336,59 @@ const extractDiscount = (html) => {
 const extractImages = (html, jsonProduct) => {
   const jsonImages = Array.isArray(jsonProduct?.image) ? jsonProduct.image : [jsonProduct?.image];
   const metaImages = parseMetaValues(html, ['og:image', 'og:image:secure_url', 'twitter:image']);
-  const urlMatches = html.match(/https?:\\?\/\\?\/[^"'<>\\\s]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'<>\\\s]*)?/gi) || [];
+  const normalizedHtml = decodeHtml(
+    html
+      .replace(/\\u002F/g, '/')
+      .replace(/\\u0026/g, '&')
+      .replace(/\\\//g, '/')
+  );
+  const urlMatches = normalizedHtml.match(/(?:https?:)?\/\/[^"'<>\\\s]+/gi) || [];
+  const attributeMatches = [];
+  const attributePattern = /(?:src|data-src|data-original|href|content)=["']([^"']+)["']/gi;
+  let attributeMatch = attributePattern.exec(normalizedHtml);
+  while (attributeMatch) {
+    attributeMatches.push(attributeMatch[1]);
+    attributeMatch = attributePattern.exec(normalizedHtml);
+  }
+  const jsonDiscovered = [];
+  walkJson(jsonProduct, (node) => {
+    Object.entries(node).forEach(([key, value]) => {
+      if (!/image|img|thumb|gallery|pic|url/i.test(key)) return;
+      if (typeof value === 'string') jsonDiscovered.push(value);
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (typeof item === 'string') jsonDiscovered.push(item);
+          if (item?.url) jsonDiscovered.push(item.url);
+          if (item?.imageUrl) jsonDiscovered.push(item.imageUrl);
+        });
+      }
+    });
+  });
 
-  return unique([...jsonImages, ...metaImages, ...urlMatches].map(sanitizeImageUrl)).slice(0, 10);
+  const imageLike = [...jsonImages, ...jsonDiscovered, ...metaImages, ...attributeMatches, ...urlMatches]
+    .map((url) => {
+      const normalized = String(url || '').startsWith('//') ? `https:${url}` : url;
+      return sanitizeImageUrl(normalized);
+    })
+    .filter((url) => {
+      if (!url) return false;
+      const lowered = url.toLowerCase();
+      return (
+        /\.(jpg|jpeg|png|webp)(?:$|\?)/i.test(lowered) ||
+        lowered.includes('img.kwcdn.com') ||
+        lowered.includes('image') ||
+        lowered.includes('thumb') ||
+        lowered.includes('gallery')
+      );
+    });
+
+  const byBaseUrl = new Map();
+  imageLike.forEach((url) => {
+    const key = url.split('?')[0].replace(/_(?:100x100|200x200|300x300|400x400|thumbnail)/gi, '');
+    if (!byBaseUrl.has(key)) byBaseUrl.set(key, url);
+  });
+
+  return [...byBaseUrl.values()].slice(0, 12);
 };
 
 const guessCategory = (title = '') => {
@@ -426,29 +502,43 @@ const buildImportedProductPreview = (url, html) => {
   }));
   const rating = normalizeNumber(jsonProduct.aggregateRating?.ratingValue, null);
   const prices = extractPriceCandidates(html, jsonProduct);
+  const sourceRank = { 'visible-text': 0, meta: 1, 'json-ld': 2, 'embedded-json': 3 };
+  const bySourceThenPrice = (a, b) => (sourceRank[a.source] ?? 9) - (sourceRank[b.source] ?? 9) || a.dhPrice - b.dhPrice;
+  const visibleUnknownCandidates = prices
+    .filter((candidate) => candidate.kind === 'unknown' && candidate.source === 'visible-text')
+    .sort((a, b) => a.dhPrice - b.dhPrice);
   const currentCandidates = prices
     .filter((candidate) => candidate.kind === 'current')
-    .sort((a, b) => a.dhPrice - b.dhPrice);
+    .sort(bySourceThenPrice);
   const unknownCandidates = prices
     .filter((candidate) => candidate.kind === 'unknown')
     .sort((a, b) => a.dhPrice - b.dhPrice);
-  const currentCandidate = currentCandidates[0] || unknownCandidates[0];
+  const currentCandidate =
+    visibleUnknownCandidates.length >= 2 ? visibleUnknownCandidates[0] : currentCandidates[0] || unknownCandidates[0];
   const originalCandidates = prices
     .filter((candidate) => candidate.kind === 'original')
     .sort((a, b) => b.dhPrice - a.dhPrice);
+  const visibleOriginalCandidate =
+    visibleUnknownCandidates.length >= 2 && currentCandidate
+      ? visibleUnknownCandidates.filter((candidate) => candidate.dhPrice > currentCandidate.dhPrice).pop()
+      : null;
   const originalCandidate =
     originalCandidates.find((candidate) => currentCandidate && candidate.dhPrice > currentCandidate.dhPrice) ||
+    visibleOriginalCandidate ||
     (unknownCandidates.length > 1 && currentCandidate
       ? unknownCandidates.filter((candidate) => candidate.dhPrice > currentCandidate.dhPrice).pop()
       : null);
   const currentPriceDh = currentCandidate?.dhPrice || 0;
   const originalPriceDh = originalCandidate?.dhPrice || currentPriceDh;
-  const finalPrice = Math.max(1, Math.round(currentPriceDh * DH_TO_COINS));
+  if (!currentCandidate || currentPriceDh <= 0) {
+    throw new Error(TEMU_PRICE_ERROR);
+  }
+  const finalPrice = Math.round(currentPriceDh * DH_TO_COINS);
   const originalPrice = Math.max(finalPrice, Math.round(originalPriceDh * DH_TO_COINS));
   const discountPercent =
     originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0;
 
-  if (!title || !images.length || !finalPrice) {
+  if (!title || !images.length) {
     throw new Error(TEMU_IMPORT_ERROR);
   }
 
@@ -676,7 +766,7 @@ const checkout = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: 'تم الشراء بنجاح',
+    message: 'تم تسجيل طلبك بنجاح، وسيتم التوصل بالمنتجات فور فتح الموقع بشكل كامل',
     order: presentOrder(order),
     user: presentUser(req.user),
   });
@@ -714,7 +804,7 @@ const adminPreviewProductImport = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     res.status(400);
-    throw new Error(TEMU_IMPORT_ERROR);
+    throw new Error(error.message === TEMU_PRICE_ERROR ? TEMU_PRICE_ERROR : TEMU_IMPORT_ERROR);
   }
 });
 
@@ -729,7 +819,7 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
   const remoteImages = parseRemoteImages(req.body.remoteImages);
   const uploadedImages = buildImagesFromFiles(req.files);
 
-  if (!title || !originalPrice || !finalPrice) {
+  if (!title || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(finalPrice) || finalPrice <= 0) {
     res.status(400);
     throw new Error('بيانات المنتج غير مكتملة');
   }
@@ -779,11 +869,25 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   if (req.body.title !== undefined) product.title = String(req.body.title).trim();
   if (req.body.description !== undefined) product.description = String(req.body.description).trim();
   if (req.body.category !== undefined) product.category = String(req.body.category).trim();
-  if (req.body.originalPrice !== undefined) product.originalPrice = Math.max(0, normalizeNumber(req.body.originalPrice, product.originalPrice));
+  if (req.body.originalPrice !== undefined) {
+    const nextOriginalPrice = normalizeNumber(req.body.originalPrice, product.originalPrice);
+    if (!Number.isFinite(nextOriginalPrice) || nextOriginalPrice <= 0) {
+      res.status(400);
+      throw new Error('بيانات المنتج غير مكتملة');
+    }
+    product.originalPrice = nextOriginalPrice;
+  }
   if (req.body.discountPercent !== undefined) {
     product.discountPercent = Math.max(0, Math.min(95, normalizeNumber(req.body.discountPercent, product.discountPercent)));
   }
-  if (req.body.finalPrice !== undefined) product.finalPrice = Math.max(1, normalizeNumber(req.body.finalPrice, product.finalPrice));
+  if (req.body.finalPrice !== undefined) {
+    const nextFinalPrice = normalizeNumber(req.body.finalPrice, product.finalPrice);
+    if (!Number.isFinite(nextFinalPrice) || nextFinalPrice <= 0) {
+      res.status(400);
+      throw new Error('بيانات المنتج غير مكتملة');
+    }
+    product.finalPrice = nextFinalPrice;
+  }
   if (req.body.stockQuantity !== undefined) product.stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity, product.stockQuantity)));
   if (req.body.rating !== undefined) product.rating = normalizeOptionalNumber(req.body.rating);
   if (req.body.promoBadge !== undefined) product.promoBadge = String(req.body.promoBadge).trim();

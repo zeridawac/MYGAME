@@ -10,7 +10,7 @@ const TaskSubmission = require('../models/TaskSubmission');
 const GameConfig = require('../models/GameConfig');
 const ActivityLog = require('../models/ActivityLog');
 const { defaultGameConfigs } = require('../utils/defaultData');
-const { getCoinRate, setCoinRate } = require('../utils/settings');
+const { getCoinRate, getStorePopup, setCoinRate, setStorePopup } = require('../utils/settings');
 const { logActivity } = require('../utils/activity');
 
 const toNumberOrCurrent = (value, current, min = 0) => {
@@ -452,6 +452,22 @@ const updateCoinConversion = asyncHandler(async (req, res) => {
   });
 });
 
+const getStorePopupSettings = asyncHandler(async (req, res) => {
+  const storePopup = await getStorePopup();
+
+  res.json({ success: true, storePopup });
+});
+
+const updateStorePopupSettings = asyncHandler(async (req, res) => {
+  const setting = await setStorePopup(req.body);
+
+  res.json({
+    success: true,
+    message: 'تم تحديث إعلان المتجر',
+    storePopup: setting.value,
+  });
+});
+
 const listGameConfigs = asyncHandler(async (req, res) => {
   await Promise.all(
     defaultGameConfigs.map((config) =>
@@ -532,6 +548,8 @@ module.exports = {
   reviewTaskSubmission,
   getCoinConversion,
   updateCoinConversion,
+  getStorePopupSettings,
+  updateStorePopupSettings,
   listGameConfigs,
   updateGameConfig,
   listActivity,

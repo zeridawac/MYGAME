@@ -6,16 +6,19 @@ import {
   Home,
   LogOut,
   ShoppingBag,
+  ShoppingCart,
   ShieldCheck,
 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatCoinDh } from '../utils/coins.js';
+import StoreAnnouncementPopup from './StoreAnnouncementPopup.jsx';
 
 const baseNav = [
   { to: '/dashboard', label: 'الرئيسية', icon: Home },
   { to: '/trading', label: 'التداول', icon: BadgeDollarSign },
   { to: '/store', label: 'المتجر', icon: ShoppingBag },
+  { to: '/cart', label: 'السلة', icon: ShoppingCart },
   { to: '/gifts', label: 'الهدايا', icon: Gift },
 ];
 
@@ -85,6 +88,7 @@ const AppLayout = () => {
           <span>خروج</span>
         </button>
       </nav>
+      <StoreAnnouncementPopup />
     </div>
   );
 };

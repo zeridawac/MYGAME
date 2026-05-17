@@ -23,6 +23,8 @@ const {
   reviewTaskSubmission,
   getCoinConversion,
   updateCoinConversion,
+  getStorePopupSettings,
+  updateStorePopupSettings,
   listGameConfigs,
   updateGameConfig,
   listActivity,
@@ -96,6 +98,8 @@ router.patch('/task-submissions/:id', reviewTaskSubmission);
 
 router.get('/settings/coin-rate', getCoinConversion);
 router.patch('/settings/coin-rate', updateCoinConversion);
+router.get('/settings/store-popup', getStorePopupSettings);
+router.patch('/settings/store-popup', updateStorePopupSettings);
 
 router.get('/game-configs', listGameConfigs);
 router.patch('/game-configs/:gameKey', updateGameConfig);

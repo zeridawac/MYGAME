@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Minus, Plus, ShoppingBag, ShoppingCart, Sparkles, Trash2, Zap } from 'lucide-react';
+import { Plus, ShoppingBag, ShoppingCart, Sparkles, Zap } from 'lucide-react';
 import api from '../api/config.js';
 import EmptyState from '../components/EmptyState.jsx';
 import Loading from '../components/Loading.jsx';
@@ -63,9 +63,7 @@ const Store = () => {
   const [activeCategory, setActiveCategory] = useState('');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const cart = useCart();
 
@@ -109,32 +107,7 @@ const Store = () => {
 
   const addToCart = (product) => {
     cart.addItem(product);
-    setCartOpen(true);
     showToast('تمت إضافة المنتج للسلة', 'success');
-  };
-
-  const checkout = async () => {
-    if (!cart.items.length) {
-      showToast('السلة فارغة', 'error');
-      return;
-    }
-
-    setCheckoutBusy(true);
-    try {
-      const { data } = await api.post('/store/checkout', {
-        items: cart.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
-      });
-      updateUser(data.user);
-      cart.clearCart();
-      setOrders((current) => [data.order, ...current]);
-      setCartOpen(false);
-      showToast(data.message, 'success');
-      await loadStore();
-    } catch (error) {
-      showToast(error.message || 'رصيد الكوينات غير كاف', 'error');
-    } finally {
-      setCheckoutBusy(false);
-    }
   };
 
   if (loading) {
@@ -149,10 +122,10 @@ const Store = () => {
           <h2>تسوق بالكوينات فقط</h2>
           <p>عروض كثيرة، بطاقات منتجات سريعة، وسلة شراء خفيفة تناسب الهاتف.</p>
         </div>
-        <button className="store-cart-button" type="button" onClick={() => setCartOpen(true)}>
+        <Link className="store-cart-button" to="/cart">
           <ShoppingCart size={20} />
           <span>{cart.itemCount}</span>
-        </button>
+        </Link>
       </section>
 
       <section className="store-promo-strip">
@@ -223,60 +196,6 @@ const Store = () => {
           <EmptyState title="لا توجد مشتريات بعد" text="مشترياتك بالكوينات ستظهر هنا." />
         )}
       </section>
-
-      {cartOpen ? (
-        <div className="store-cart-backdrop" onClick={() => setCartOpen(false)}>
-          <aside className="store-cart-sheet" onClick={(event) => event.stopPropagation()}>
-            <div className="section-heading compact-heading">
-              <div>
-                <span className="eyebrow">السلة</span>
-                <h3>سلة التسوق</h3>
-              </div>
-              <button className="icon-button" type="button" onClick={() => setCartOpen(false)}>
-                ×
-              </button>
-            </div>
-
-            {cart.items.length ? (
-              <>
-                <div className="store-cart-list">
-                  {cart.items.map((item) => (
-                    <article key={item.productId}>
-                      <img src={productImageUrl(item)} alt={item.title} />
-                      <div>
-                        <strong>{item.title}</strong>
-                        <span>{formatCoins(item.finalPrice)} كوين</span>
-                        <div className="store-qty-row">
-                          <button type="button" onClick={() => cart.updateQuantity(item.productId, item.quantity - 1)}>
-                            <Minus size={14} />
-                          </button>
-                          <b>{item.quantity}</b>
-                          <button type="button" onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}>
-                            <Plus size={14} />
-                          </button>
-                          <button type="button" onClick={() => cart.removeItem(item.productId)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <div className="store-cart-total">
-                  <span>المجموع</span>
-                  <strong>{formatCoins(cart.totalCoins)} كوين</strong>
-                </div>
-                <button className="primary-button" type="button" onClick={checkout} disabled={checkoutBusy}>
-                  <ShoppingBag size={18} />
-                  <span>{checkoutBusy ? 'جاري الشراء...' : 'إتمام الشراء'}</span>
-                </button>
-              </>
-            ) : (
-              <EmptyState title="السلة فارغة" text="أضف منتجا للبدء." />
-            )}
-          </aside>
-        </div>
-      ) : null}
     </div>
   );
 };

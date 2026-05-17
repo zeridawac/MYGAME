@@ -6431,6 +6431,105 @@ body:has(.games-page) {
   font-size: 1.12rem;
 }
 
+.cart-page {
+  overflow-x: hidden;
+}
+
+.cart-hero {
+  min-height: 112px;
+}
+
+.cart-hero svg {
+  color: var(--gold);
+}
+
+.cart-success-message {
+  padding: 0.85rem;
+  color: #dfffee;
+  background: rgba(87, 214, 141, 0.13);
+  border: 1px solid rgba(87, 214, 141, 0.28);
+  border-radius: var(--radius);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+  line-height: 1.7;
+}
+
+.cart-layout {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.cart-items-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.cart-item-card,
+.cart-summary-card {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.032)),
+    rgba(12, 17, 25, 0.84);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.2);
+}
+
+.cart-item-card {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.65rem;
+}
+
+.cart-item-card img {
+  width: 78px;
+  height: 78px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.cart-item-card strong,
+.cart-item-card span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-item-card span {
+  margin-top: 0.18rem;
+  color: var(--gold);
+  font-weight: 900;
+}
+
+.cart-summary-card {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  padding: 0.85rem;
+}
+
+.cart-summary-card span,
+.cart-summary-card p {
+  color: var(--muted);
+}
+
+.cart-summary-card p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.cart-summary-card strong {
+  color: var(--gold);
+  font-size: 1.5rem;
+}
+
+.cart-store-link {
+  width: 100%;
+  margin-top: 0.7rem;
+}
+
 .store-back-link {
   justify-self: start;
   width: auto;
@@ -6761,6 +6860,78 @@ body:has(.games-page) {
   line-height: 1;
 }
 
+.store-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(3, 6, 10, 0.72);
+  backdrop-filter: blur(14px);
+  animation: fadeIn 180ms ease both;
+}
+
+.store-popup-panel {
+  position: relative;
+  width: min(420px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 1.2rem;
+  text-align: center;
+  border: 1px solid rgba(62, 226, 197, 0.18);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(62, 226, 197, 0.16), transparent 16rem),
+    linear-gradient(180deg, rgba(24, 32, 45, 0.98), rgba(9, 13, 21, 0.98));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.54);
+  animation: sheetRise 220ms ease both;
+}
+
+.store-popup-close {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}
+
+.store-popup-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: #06100d;
+  background: linear-gradient(135deg, var(--gold), #fff0a8);
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(247, 201, 72, 0.2);
+}
+
+.store-popup-panel h3,
+.store-popup-panel p {
+  margin: 0;
+}
+
+.store-popup-panel h3 {
+  font-size: 1.28rem;
+}
+
+.store-popup-panel p {
+  color: var(--muted);
+  line-height: 1.85;
+}
+
+.store-popup-panel .primary-button {
+  width: 100%;
+}
+
 .admin-store-grid {
   align-items: start;
 }
@@ -6920,6 +7091,16 @@ body:has(.games-page) {
   .admin-store-grid {
     grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
   }
+
+  .cart-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    align-items: start;
+  }
+
+  .cart-summary-card {
+    position: sticky;
+    top: 1rem;
+  }
 }
 
 @media (min-width: 1180px) {
@@ -7008,6 +7189,28 @@ body:has(.games-page) {
   .store-cart-list img {
     width: 62px;
     height: 62px;
+  }
+
+  .cart-hero {
+    min-height: 92px;
+  }
+
+  .cart-item-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 0.55rem;
+  }
+
+  .cart-item-card img {
+    width: 64px;
+    height: 64px;
+  }
+
+  .cart-summary-card {
+    padding: 0.7rem;
+  }
+
+  .store-popup-panel {
+    padding: 1rem;
   }
 
   .admin-store-products article {

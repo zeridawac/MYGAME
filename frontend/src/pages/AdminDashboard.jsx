@@ -53,6 +53,14 @@ const AdminDashboard = () => {
   const [coupons, setCoupons] = useState([]);
   const [storeProducts, setStoreProducts] = useState([]);
   const [storeOrders, setStoreOrders] = useState([]);
+  const [popupForm, setPopupForm] = useState({
+    enabled: true,
+    title: 'إعلان المتجر',
+    message:
+      'تم إطلاق متجر جديد داخل المنصة. يمكنك الآن اختيار منتجات متنوعة والدفع باستعمال الكوينات فقط. سيتم إيصال المنتجات قريباً فور فتح الموقع بشكل كامل.',
+    buttonText: 'دخول المتجر',
+    targetPath: '/store',
+  });
   const [activity, setActivity] = useState([]);
   const [inviteForm, setInviteForm] = useState({ code: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
@@ -125,6 +133,7 @@ const AdminDashboard = () => {
         couponsRes,
         storeProductsRes,
         storeOrdersRes,
+        popupRes,
         activityRes,
       ] = await Promise.all([
         api.get('/admin/users'),
@@ -135,6 +144,7 @@ const AdminDashboard = () => {
         api.get('/admin/coupons'),
         api.get('/admin/store/products'),
         api.get('/admin/store/orders'),
+        api.get('/admin/settings/store-popup'),
         api.get('/admin/activity'),
       ]);
 
@@ -146,6 +156,7 @@ const AdminDashboard = () => {
       setCoupons(couponsRes.data.coupons);
       setStoreProducts(storeProductsRes.data.products);
       setStoreOrders(storeOrdersRes.data.orders);
+      setPopupForm(popupRes.data.storePopup);
       setActivity(activityRes.data.activity);
     } catch (error) {
       showToast(error.message, 'error');
@@ -430,6 +441,17 @@ const AdminDashboard = () => {
     try {
       const { data } = await api.delete(`/admin/store/products/${product.id || product._id}`);
       setStoreProducts((current) => current.filter((item) => item.id !== (product.id || product._id)));
+      showToast(data.message, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const updatePopupSettings = async (event) => {
+    event.preventDefault();
+    try {
+      const { data } = await api.patch('/admin/settings/store-popup', popupForm);
+      setPopupForm(data.storePopup);
       showToast(data.message, 'success');
     } catch (error) {
       showToast(error.message, 'error');
@@ -1103,12 +1125,61 @@ const AdminDashboard = () => {
         ) : null}
 
         {activeTab === 'settings' ? (
-          <section className="stack-form admin-form settings-form">
-            <h3>قيمة الكوينات بالدرهم</h3>
-            <p className="helper-text">التحويل المعروض حاليا ثابت: 1000 كوين = 100 DH.</p>
-            <p className="helper-text">مثال: 600 كوين = 60 DH.</p>
-            <p className="helper-text">هذه قيمة عرض فقط ولا تغير رصيد أي مستخدم في قاعدة البيانات.</p>
-          </section>
+          <div className="admin-section-grid">
+            <section className="stack-form admin-form settings-form">
+              <h3>قيمة الكوينات بالدرهم</h3>
+              <p className="helper-text">التحويل المعروض حاليا ثابت: 1000 كوين = 100 DH.</p>
+              <p className="helper-text">مثال: 600 كوين = 60 DH.</p>
+              <p className="helper-text">هذه قيمة عرض فقط ولا تغير رصيد أي مستخدم في قاعدة البيانات.</p>
+            </section>
+
+            <form className="stack-form admin-form popup-settings-form" onSubmit={updatePopupSettings}>
+              <h3>إعلان منبثق للمستخدمين</h3>
+              <label className="switch-line">
+                <input
+                  type="checkbox"
+                  checked={popupForm.enabled}
+                  onChange={(event) => setPopupForm({ ...popupForm, enabled: event.target.checked })}
+                />
+                <span>تفعيل الإعلان</span>
+              </label>
+              <label>
+                <span>العنوان</span>
+                <input
+                  value={popupForm.title}
+                  onChange={(event) => setPopupForm({ ...popupForm, title: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>الرسالة</span>
+                <textarea
+                  rows="4"
+                  value={popupForm.message}
+                  onChange={(event) => setPopupForm({ ...popupForm, message: event.target.value })}
+                />
+              </label>
+              <div className="form-two">
+                <label>
+                  <span>نص الزر</span>
+                  <input
+                    value={popupForm.buttonText}
+                    onChange={(event) => setPopupForm({ ...popupForm, buttonText: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>الصفحة المستهدفة</span>
+                  <input
+                    value={popupForm.targetPath}
+                    onChange={(event) => setPopupForm({ ...popupForm, targetPath: event.target.value })}
+                    placeholder="/store"
+                  />
+                </label>
+              </div>
+              <button className="primary-button" type="submit">
+                حفظ الإعلان
+              </button>
+            </form>
+          </div>
         ) : null}
 
         {activeTab === 'activity' ? (
