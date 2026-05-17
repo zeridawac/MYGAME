@@ -3,6 +3,7 @@ import {
   Banknote,
   Crown,
   Gift,
+  Home,
   LogOut,
   ShoppingBag,
   ShieldCheck,
@@ -12,6 +13,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { formatCoinDh } from '../utils/coins.js';
 
 const baseNav = [
+  { to: '/dashboard', label: 'الرئيسية', icon: Home },
   { to: '/trading', label: 'التداول', icon: BadgeDollarSign },
   { to: '/store', label: 'المتجر', icon: ShoppingBag },
   { to: '/gifts', label: 'الهدايا', icon: Gift },

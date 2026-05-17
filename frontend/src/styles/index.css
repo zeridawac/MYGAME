@@ -2965,6 +2965,210 @@ label {
   line-height: 1.7;
 }
 
+.home-page {
+  gap: 0.8rem;
+}
+
+.home-hero {
+  min-height: 118px;
+  padding: 1rem;
+}
+
+.home-hero h2 {
+  font-size: clamp(1.4rem, 6vw, 2rem);
+}
+
+.home-hero p {
+  margin: 0.3rem 0 0;
+}
+
+.home-quick-stats,
+.home-action-strip,
+.home-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.home-quick-stats article,
+.home-action-card,
+.home-live-panel,
+.home-section,
+.home-product-card {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.074), rgba(255, 255, 255, 0.032)),
+    rgba(12, 17, 25, 0.8);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+}
+
+.home-quick-stats article {
+  display: grid;
+  gap: 0.24rem;
+  padding: 0.62rem;
+}
+
+.home-quick-stats svg {
+  color: var(--cyan);
+}
+
+.home-quick-stats span,
+.home-action-card span,
+.home-market-row b {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.home-quick-stats strong {
+  overflow: hidden;
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-action-card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.68rem;
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.home-action-card:hover {
+  border-color: rgba(62, 226, 197, 0.24);
+  transform: translateY(-2px);
+}
+
+.home-action-card svg {
+  color: var(--gold);
+}
+
+.home-action-card strong {
+  font-size: 0.9rem;
+}
+
+.home-live-panel,
+.home-section {
+  padding: 0.78rem;
+}
+
+.home-market-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.62rem;
+  color: var(--text);
+  background: rgba(62, 226, 197, 0.07);
+  border: 1px solid rgba(62, 226, 197, 0.14);
+  border-radius: var(--radius);
+}
+
+.home-market-row span {
+  color: var(--cyan);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-product-grid,
+.home-mini-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-mini-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.home-product-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.45rem;
+  overflow: hidden;
+}
+
+.home-product-card img {
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.home-product-card strong,
+.home-product-card span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-product-card strong {
+  font-size: 0.8rem;
+}
+
+.home-product-card span {
+  margin-top: 0.16rem;
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.home-product-card b {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  padding: 0.16rem 0.32rem;
+  color: #fff;
+  background: linear-gradient(135deg, #ff4168, #ff9b54);
+  border-radius: 999px;
+  font-size: 0.66rem;
+}
+
+.home-deal-row {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+  scrollbar-width: none;
+}
+
+.home-deal-row::-webkit-scrollbar {
+  display: none;
+}
+
+.home-deal-row a {
+  position: relative;
+  flex: 0 0 74px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.home-deal-row img {
+  display: block;
+  width: 74px;
+  height: 74px;
+  object-fit: cover;
+}
+
+.home-deal-row span {
+  position: absolute;
+  right: 0.28rem;
+  bottom: 0.28rem;
+  padding: 0.16rem 0.32rem;
+  color: #fff;
+  background: rgba(255, 92, 112, 0.94);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
 .announcement-list,
 .mini-list {
   display: grid;
@@ -3995,15 +4199,15 @@ th {
 }
 
 .admin-metrics article {
-  min-height: 106px;
+  min-height: 92px;
   display: grid;
   align-content: center;
-  gap: 0.35rem;
-  padding: 1rem;
+  gap: 0.25rem;
+  padding: 0.82rem;
 }
 
 .admin-metrics strong {
-  font-size: 2rem;
+  font-size: 1.65rem;
 }
 
 .admin-metrics span {
@@ -4013,12 +4217,12 @@ th {
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.42rem;
+  margin-bottom: 0.82rem;
 }
 
 .admin-tabs button {
-  min-height: 42px;
+  min-height: 38px;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -4026,7 +4230,7 @@ th {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.7rem 0.9rem;
+  padding: 0.58rem 0.72rem;
   font-weight: 900;
 }
 
@@ -4336,9 +4540,9 @@ th {
     left: 0.7rem;
     z-index: 50;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
     gap: 0.25rem;
-    padding: 0.45rem;
+    padding: 0.38rem;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: rgba(8, 11, 16, 0.9);
@@ -4348,20 +4552,20 @@ th {
 
   .mobile-nav a {
     min-width: 0;
-    min-height: 54px;
+    min-height: 48px;
     flex-direction: column;
     justify-content: center;
     gap: 0.2rem;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
   }
 
   .mobile-nav button {
     min-width: 0;
-    min-height: 54px;
+    min-height: 48px;
     flex-direction: column;
     justify-content: center;
     gap: 0.2rem;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
   }
 
   .mobile-nav span {
@@ -4394,8 +4598,27 @@ th {
   }
 
   .main-content {
-    padding: 0.75rem;
-    padding-bottom: 5.7rem;
+    padding: 0.62rem;
+    padding-bottom: 5.25rem;
+  }
+
+  .topbar {
+    min-height: auto;
+    gap: 0.55rem;
+    margin-bottom: 0.62rem;
+  }
+
+  .topbar h1 {
+    margin-top: 0.1rem;
+    font-size: 1.08rem;
+  }
+
+  .topbar .eyebrow {
+    font-size: 0.68rem;
+  }
+
+  .page-stack {
+    gap: 0.68rem;
   }
 
   .hero-panel,
@@ -4403,7 +4626,42 @@ th {
   .asset-card,
   .mini-game-card,
   .task-card {
-    padding: 0.9rem;
+    padding: 0.72rem;
+  }
+
+  .hero-panel h2 {
+    margin-top: 0.2rem;
+  }
+
+  .hero-panel p {
+    margin: 0.24rem 0 0;
+    line-height: 1.55;
+    font-size: 0.84rem;
+  }
+
+  .section-heading {
+    gap: 0.55rem;
+    margin-bottom: 0.62rem;
+  }
+
+  .section-heading h2,
+  .section-heading h3 {
+    margin-top: 0.1rem;
+    font-size: 1rem;
+  }
+
+  .primary-button,
+  .ghost-button,
+  .danger-button,
+  .success-button,
+  .logout-button,
+  .icon-button {
+    min-height: 38px;
+  }
+
+  input,
+  textarea {
+    padding: 0.68rem 0.76rem;
   }
 
   .stats-grid,
@@ -4412,6 +4670,43 @@ th {
   .action-grid,
   .form-two {
     grid-template-columns: 1fr;
+  }
+
+  .admin-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .admin-metrics article {
+    min-height: 68px;
+    padding: 0.62rem;
+  }
+
+  .admin-metrics strong {
+    font-size: 1.24rem;
+  }
+
+  .admin-metrics span {
+    font-size: 0.74rem;
+  }
+
+  .admin-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    margin-inline: -0.1rem;
+    padding: 0.04rem 0.1rem 0.2rem;
+    scrollbar-width: none;
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-tabs button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0.5rem 0.62rem;
+    font-size: 0.78rem;
   }
 
   .market-terminal {
@@ -4553,6 +4848,49 @@ th {
 
   .mobile-sheet-links {
     grid-template-columns: 1fr;
+  }
+
+  .home-quick-stats,
+  .home-action-strip {
+    gap: 0.42rem;
+  }
+
+  .home-quick-stats article,
+  .home-action-card,
+  .home-live-panel,
+  .home-section {
+    padding: 0.58rem;
+  }
+
+  .home-action-card strong {
+    font-size: 0.78rem;
+  }
+
+  .home-action-card span {
+    font-size: 0.66rem;
+  }
+
+  .home-product-grid {
+    gap: 0.45rem;
+  }
+
+  .home-product-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 0.45rem;
+  }
+
+  .home-product-card img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .home-market-row {
+    padding: 0.52rem;
+    grid-template-columns: 1fr auto;
+  }
+
+  .home-market-row b {
+    grid-column: 1 / -1;
   }
 }
 
@@ -5545,7 +5883,7 @@ body:has(.games-page) {
 
 @media (max-width: 620px) {
   .trading-page {
-    gap: 0.85rem;
+    gap: 0.62rem;
   }
 
   .trading-hero,
@@ -5554,20 +5892,39 @@ body:has(.games-page) {
   .active-trade-card,
   .active-trade-empty,
   .trade-history-card {
-    padding: 14px;
+    padding: 11px;
+  }
+
+  .trading-hero h2 {
+    font-size: 1.42rem;
+  }
+
+  .trading-balance-strip,
+  .trade-bottom-grid,
+  .trading-terminal {
+    gap: 0.58rem;
+  }
+
+  .trading-stat {
+    padding: 0.62rem;
+  }
+
+  .trading-stat strong {
+    font-size: 0.84rem;
   }
 
   .trading-chart-head {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    margin-bottom: 0.5rem;
   }
 
   .trading-live-price {
-    text-align: right;
+    text-align: left;
   }
 
   .binary-chart-shell {
-    height: 285px;
+    height: 246px;
   }
 
   .binary-grid-label,
@@ -5578,6 +5935,42 @@ body:has(.games-page) {
   .direction-button,
   .open-trade-button {
     width: 100%;
+  }
+
+  .direction-button,
+  .open-trade-button {
+    min-height: 44px;
+  }
+
+  .trade-ticket-head {
+    margin-bottom: 0.62rem;
+  }
+
+  .trade-amount-field {
+    margin-top: 0.62rem;
+  }
+
+  .trade-amount-field input {
+    min-height: 44px;
+  }
+
+  .amount-chip-grid {
+    gap: 0.38rem;
+    margin-top: 0.5rem;
+  }
+
+  .amount-chip-grid button {
+    min-height: 40px;
+  }
+
+  .trade-payout-card {
+    margin-top: 0.58rem;
+    padding: 0.62rem;
+  }
+
+  .trading-safety-note,
+  .trading-chart-footer {
+    display: none;
   }
 
   .amount-chip-grid {
@@ -5739,7 +6132,7 @@ body:has(.games-page) {
 .store-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.52rem;
 }
 
 .store-product-card {
@@ -5819,17 +6212,17 @@ body:has(.games-page) {
 
 .store-product-body {
   display: grid;
-  gap: 0.48rem;
-  padding: 0.62rem;
+  gap: 0.34rem;
+  padding: 0.48rem;
 }
 
 .store-product-body h3 {
-  min-height: 2.55rem;
+  min-height: 2.3rem;
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 0.9rem;
-  line-height: 1.42;
+  font-size: 0.82rem;
+  line-height: 1.36;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -5847,7 +6240,7 @@ body:has(.games-page) {
 
 .store-price-row strong {
   color: var(--gold);
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -5871,8 +6264,8 @@ body:has(.games-page) {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   color: #06100d;
   background: linear-gradient(135deg, var(--cyan), #d5fff6);
   border-radius: 8px;
@@ -5881,6 +6274,48 @@ body:has(.games-page) {
 
 .store-orders-panel {
   overflow: hidden;
+}
+
+.store-shelf {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.store-shelf .section-heading {
+  margin-bottom: 0;
+}
+
+.store-shelf-row {
+  display: flex;
+  gap: 0.55rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.05rem 0 0.2rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.store-shelf-row::-webkit-scrollbar {
+  display: none;
+}
+
+.store-shelf-row .store-product-card {
+  flex: 0 0 min(42vw, 156px);
+  scroll-snap-align: start;
+}
+
+.store-shelf-row .store-product-body h3 {
+  min-height: 2rem;
+  font-size: 0.78rem;
+}
+
+.store-shelf-row .store-discount-badge {
+  font-size: 0.68rem;
+}
+
+.store-shelf-row .store-hot-badge {
+  display: none;
 }
 
 .store-cart-backdrop {
@@ -6255,6 +6690,39 @@ body:has(.games-page) {
   grid-column: 1 / -1;
 }
 
+.store-import-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.store-import-price-grid article {
+  min-width: 0;
+  padding: 0.55rem;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 8px;
+}
+
+.store-import-price-grid span,
+.store-import-price-grid strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-import-price-grid span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.store-import-price-grid strong {
+  margin-top: 0.16rem;
+  color: var(--gold);
+  font-size: 0.86rem;
+}
+
 .store-import-gallery {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -6463,15 +6931,16 @@ body:has(.games-page) {
 @media (max-width: 520px) {
   .store-page,
   .product-page {
-    gap: 0.8rem;
+    gap: 0.58rem;
   }
 
   .store-hero {
-    padding: 14px;
+    min-height: 96px;
+    padding: 11px;
   }
 
   .store-hero p {
-    font-size: 0.86rem;
+    display: none;
   }
 
   .store-promo-strip {
@@ -6479,17 +6948,52 @@ body:has(.games-page) {
   }
 
   .store-promo-strip article {
-    min-height: 44px;
-    padding: 0.55rem 0.32rem;
-    font-size: 0.72rem;
+    min-height: 38px;
+    padding: 0.42rem 0.26rem;
+    font-size: 0.68rem;
   }
 
   .store-product-body {
-    padding: 0.55rem;
+    padding: 0.42rem;
   }
 
   .store-product-body h3 {
+    min-height: 2.05rem;
+    font-size: 0.76rem;
+  }
+
+  .store-price-row del {
+    font-size: 0.66rem;
+  }
+
+  .store-price-row strong {
     font-size: 0.84rem;
+  }
+
+  .store-discount-badge {
+    top: 0.36rem;
+    right: 0.36rem;
+    padding: 0.24rem 0.38rem;
+    font-size: 0.68rem;
+  }
+
+  .store-hot-badge {
+    left: 0.36rem;
+    bottom: 0.36rem;
+    font-size: 0.62rem;
+  }
+
+  .store-card-bottom span {
+    font-size: 0.66rem;
+  }
+
+  .store-card-bottom button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .store-shelf-row .store-product-card {
+    flex-basis: min(38vw, 145px);
   }
 
   .store-cart-sheet {

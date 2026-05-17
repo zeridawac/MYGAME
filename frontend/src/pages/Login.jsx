@@ -24,9 +24,9 @@ const Login = () => {
       const nextUser = await login(form);
       showToast('تم تسجيل الدخول بنجاح', 'success');
       const targetPath = location.state?.from?.pathname;
-      const safeTarget = targetPath && !['/games', '/tasks', '/withdrawals', '/bank', '/dashboard'].includes(targetPath)
+      const safeTarget = targetPath && !['/games', '/tasks', '/withdrawals', '/bank'].includes(targetPath)
         ? targetPath
-        : '/trading';
+        : '/dashboard';
       navigate(nextUser.isAdmin ? '/admin' : safeTarget, {
         replace: true,
       });

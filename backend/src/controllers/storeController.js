@@ -94,6 +94,11 @@ const normalizeNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const normalizeOptionalNumber = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  return normalizeNumber(value, null);
+};
+
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
 const decodeHtml = (value = '') =>
@@ -190,33 +195,104 @@ const extractJsonLdProducts = (html) => {
   return products;
 };
 
+const normalizeCurrency = (value = '') => {
+  const token = String(value).trim().toUpperCase();
+  if (['MAD', 'DH', 'DHS', 'د.م', 'درهم'].includes(token)) return 'MAD';
+  if (['USD', '$', 'US$'].includes(token)) return 'USD';
+  if (['EUR', '€'].includes(token)) return 'EUR';
+  return token || 'MAD';
+};
+
+const currencyToDh = (currency) => {
+  const normalized = normalizeCurrency(currency);
+  if (normalized === 'USD') return 10;
+  if (normalized === 'EUR') return 11;
+  return 1;
+};
+
+const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source = 'page') => {
+  const parsedAmount = normalizePrice(amount);
+  if (!parsedAmount || parsedAmount <= 0 || parsedAmount > 1000000) return null;
+  const normalizedCurrency = normalizeCurrency(currency);
+  const dhPrice = parsedAmount * currencyToDh(normalizedCurrency);
+
+  return {
+    amount: Number(parsedAmount.toFixed(2)),
+    currency: normalizedCurrency,
+    dhPrice: Number(dhPrice.toFixed(2)),
+    kind,
+    source,
+  };
+};
+
+const collectPrice = (collection, amount, currency, kind, source) => {
+  const candidate = buildPriceCandidate(amount, currency, kind, source);
+  if (candidate) collection.push(candidate);
+};
+
 const extractPriceCandidates = (html, jsonProduct) => {
   const candidates = [];
   const offer = Array.isArray(jsonProduct?.offers) ? jsonProduct.offers[0] : jsonProduct?.offers;
-  [jsonProduct?.price, offer?.price, offer?.lowPrice, offer?.highPrice].forEach((value) => {
-    const price = normalizePrice(value);
-    if (price > 0) candidates.push(price);
-  });
+  const jsonCurrency = offer?.priceCurrency || jsonProduct?.priceCurrency || 'MAD';
 
-  const text = decodeHtml(html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' '));
-  const pricePatterns = [
-    /(?:MAD|DH|درهم|د\.م)\s*([0-9]+(?:[.,][0-9]+)?)/gi,
-    /([0-9]+(?:[.,][0-9]+)?)\s*(?:MAD|DH|درهم|د\.م)/gi,
-    /"price"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/gi,
-    /"salePrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/gi,
-    /"originalPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/gi,
+  collectPrice(candidates, jsonProduct?.price, jsonCurrency, 'current', 'json-ld');
+  collectPrice(candidates, offer?.price, jsonCurrency, 'current', 'json-ld');
+  collectPrice(candidates, offer?.lowPrice, jsonCurrency, 'current', 'json-ld');
+  collectPrice(candidates, offer?.highPrice, jsonCurrency, 'original', 'json-ld');
+
+  const metaCurrency = parseMetaValues(html, ['product:price:currency', 'og:price:currency'])[0] || jsonCurrency;
+  const metaPrice = parseMetaValues(html, ['product:price:amount', 'og:price:amount'])[0];
+  collectPrice(candidates, metaPrice, metaCurrency, 'current', 'meta');
+
+  const normalizedHtml = decodeHtml(html.replace(/\\u002F/g, '/').replace(/\\\//g, '/'));
+  const keyPatterns = [
+    {
+      kind: 'current',
+      pattern:
+        /"(?:salePrice|salesPrice|currentPrice|discountPrice|finalPrice|price|priceAmount)"\s*:\s*(?:"[^"]*?([0-9]+(?:[.,][0-9]+)?)"|\{[^{}]{0,260}?(?:"amount"|"value"|"price")\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?[^{}]*\})/gi,
+    },
+    {
+      kind: 'original',
+      pattern:
+        /"(?:originalPrice|retailPrice|marketPrice|listPrice|wasPrice|strikePrice|beforePrice)"\s*:\s*(?:"[^"]*?([0-9]+(?:[.,][0-9]+)?)"|\{[^{}]{0,260}?(?:"amount"|"value"|"price")\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?[^{}]*\})/gi,
+    },
   ];
 
-  pricePatterns.forEach((pattern) => {
-    let match = pattern.exec(text);
+  keyPatterns.forEach(({ kind, pattern }) => {
+    let match = pattern.exec(normalizedHtml);
     while (match) {
-      const price = normalizePrice(match[1]);
-      if (price > 0 && price < 100000) candidates.push(price);
-      match = pattern.exec(text);
+      const currencyWindow = normalizedHtml.slice(Math.max(0, match.index - 180), match.index + 260);
+      const currencyMatch = currencyWindow.match(/"(?:currency|priceCurrency|currencyCode)"\s*:\s*"([A-Z$€]{1,5}|MAD|USD|EUR|DH)"/i);
+      collectPrice(candidates, match[1] || match[2], currencyMatch?.[1] || metaCurrency, kind, 'embedded-json');
+      match = pattern.exec(normalizedHtml);
     }
   });
 
-  return unique(candidates.map((price) => Number(price.toFixed(2))));
+  const visibleText = normalizedHtml.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ');
+  const currencyBeforePattern = /(?:MAD|USD|EUR|DH|DHS|\$|€|درهم|د\.م)\s*([0-9]+(?:[.,][0-9]+)?)/gi;
+  const currencyAfterPattern = /([0-9]+(?:[.,][0-9]+)?)\s*(?:MAD|USD|EUR|DH|DHS|\$|€|درهم|د\.م)/gi;
+
+  let match = currencyBeforePattern.exec(visibleText);
+  while (match) {
+    const currency = match[0].replace(match[1], '').trim();
+    collectPrice(candidates, match[1], currency, 'unknown', 'visible-text');
+    match = currencyBeforePattern.exec(visibleText);
+  }
+
+  match = currencyAfterPattern.exec(visibleText);
+  while (match) {
+    const currency = match[0].replace(match[1], '').trim();
+    collectPrice(candidates, match[1], currency, 'unknown', 'visible-text');
+    match = currencyAfterPattern.exec(visibleText);
+  }
+
+  const seen = new Set();
+  return candidates.filter((candidate) => {
+    const key = `${candidate.kind}-${candidate.currency}-${candidate.amount}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 const extractDiscount = (html) => {
@@ -349,24 +425,34 @@ const buildImportedProductPreview = (url, html) => {
     mimeType: 'external/image',
   }));
   const rating = normalizeNumber(jsonProduct.aggregateRating?.ratingValue, null);
-  const prices = extractPriceCandidates(html, jsonProduct).sort((a, b) => a - b);
-  const currentPriceDh = prices[0] || 0;
-  const explicitOriginalDh = prices.length > 1 ? prices[prices.length - 1] : 0;
-  const detectedDiscount = extractDiscount(html);
-  const originalPriceDh =
-    explicitOriginalDh > currentPriceDh
-      ? explicitOriginalDh
-      : Math.ceil(currentPriceDh / (1 - (detectedDiscount || 25) / 100));
+  const prices = extractPriceCandidates(html, jsonProduct);
+  const currentCandidates = prices
+    .filter((candidate) => candidate.kind === 'current')
+    .sort((a, b) => a.dhPrice - b.dhPrice);
+  const unknownCandidates = prices
+    .filter((candidate) => candidate.kind === 'unknown')
+    .sort((a, b) => a.dhPrice - b.dhPrice);
+  const currentCandidate = currentCandidates[0] || unknownCandidates[0];
+  const originalCandidates = prices
+    .filter((candidate) => candidate.kind === 'original')
+    .sort((a, b) => b.dhPrice - a.dhPrice);
+  const originalCandidate =
+    originalCandidates.find((candidate) => currentCandidate && candidate.dhPrice > currentCandidate.dhPrice) ||
+    (unknownCandidates.length > 1 && currentCandidate
+      ? unknownCandidates.filter((candidate) => candidate.dhPrice > currentCandidate.dhPrice).pop()
+      : null);
+  const currentPriceDh = currentCandidate?.dhPrice || 0;
+  const originalPriceDh = originalCandidate?.dhPrice || currentPriceDh;
   const finalPrice = Math.max(1, Math.round(currentPriceDh * DH_TO_COINS));
   const originalPrice = Math.max(finalPrice, Math.round(originalPriceDh * DH_TO_COINS));
   const discountPercent =
-    detectedDiscount ||
-    (originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0);
+    originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0;
 
   if (!title || !images.length || !finalPrice) {
     throw new Error(TEMU_IMPORT_ERROR);
   }
 
+  const detectedDiscount = extractDiscount(html);
   const stockQuantity = stableNumber(`${title}-${url}`, 6, 24);
   const promoBadge = discountPercent >= 45 ? 'عرض محدود' : discountPercent >= 30 ? 'خصم قوي' : 'وصل حديثا';
 
@@ -384,7 +470,12 @@ const buildImportedProductPreview = (url, html) => {
     promoBadge,
     sourceUrl: url,
     sourceProvider: 'temu',
+    sourceCurrency: currentCandidate?.currency || 'MAD',
+    sourcePriceAmount: currentCandidate?.amount || null,
     sourcePriceDh: Number(currentPriceDh.toFixed(2)),
+    sourceOriginalPriceAmount: originalCandidate?.amount || null,
+    sourceOriginalPriceDh: originalCandidate ? Number(originalPriceDh.toFixed(2)) : null,
+    detectedDiscount,
     images,
   };
 };
@@ -403,7 +494,11 @@ const presentProduct = (product) => ({
   promoBadge: product.promoBadge,
   sourceUrl: product.sourceUrl,
   sourceProvider: product.sourceProvider,
+  sourceCurrency: product.sourceCurrency,
+  sourcePriceAmount: product.sourcePriceAmount,
   sourcePriceDh: product.sourcePriceDh,
+  sourceOriginalPriceAmount: product.sourceOriginalPriceAmount,
+  sourceOriginalPriceDh: product.sourceOriginalPriceDh,
   featured: product.featured,
   active: product.active,
   images: product.images || [],
@@ -647,11 +742,15 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
     discountPercent,
     finalPrice,
     stockQuantity,
-    rating: normalizeNumber(req.body.rating, null),
+    rating: normalizeOptionalNumber(req.body.rating),
     promoBadge: String(req.body.promoBadge || '').trim(),
     sourceUrl: String(req.body.sourceUrl || '').trim(),
     sourceProvider: String(req.body.sourceProvider || '').trim(),
-    sourcePriceDh: normalizeNumber(req.body.sourcePriceDh, null),
+    sourceCurrency: String(req.body.sourceCurrency || '').trim(),
+    sourcePriceAmount: normalizeOptionalNumber(req.body.sourcePriceAmount),
+    sourcePriceDh: normalizeOptionalNumber(req.body.sourcePriceDh),
+    sourceOriginalPriceAmount: normalizeOptionalNumber(req.body.sourceOriginalPriceAmount),
+    sourceOriginalPriceDh: normalizeOptionalNumber(req.body.sourceOriginalPriceDh),
     featured: req.body.featured === 'true' || req.body.featured === true,
     active: req.body.active !== 'false' && req.body.active !== false,
     images: [...remoteImages, ...uploadedImages].slice(0, 10),
@@ -686,11 +785,15 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   }
   if (req.body.finalPrice !== undefined) product.finalPrice = Math.max(1, normalizeNumber(req.body.finalPrice, product.finalPrice));
   if (req.body.stockQuantity !== undefined) product.stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity, product.stockQuantity)));
-  if (req.body.rating !== undefined) product.rating = normalizeNumber(req.body.rating, null);
+  if (req.body.rating !== undefined) product.rating = normalizeOptionalNumber(req.body.rating);
   if (req.body.promoBadge !== undefined) product.promoBadge = String(req.body.promoBadge).trim();
   if (req.body.sourceUrl !== undefined) product.sourceUrl = String(req.body.sourceUrl).trim();
   if (req.body.sourceProvider !== undefined) product.sourceProvider = String(req.body.sourceProvider).trim();
-  if (req.body.sourcePriceDh !== undefined) product.sourcePriceDh = normalizeNumber(req.body.sourcePriceDh, null);
+  if (req.body.sourceCurrency !== undefined) product.sourceCurrency = String(req.body.sourceCurrency).trim();
+  if (req.body.sourcePriceAmount !== undefined) product.sourcePriceAmount = normalizeOptionalNumber(req.body.sourcePriceAmount);
+  if (req.body.sourcePriceDh !== undefined) product.sourcePriceDh = normalizeOptionalNumber(req.body.sourcePriceDh);
+  if (req.body.sourceOriginalPriceAmount !== undefined) product.sourceOriginalPriceAmount = normalizeOptionalNumber(req.body.sourceOriginalPriceAmount);
+  if (req.body.sourceOriginalPriceDh !== undefined) product.sourceOriginalPriceDh = normalizeOptionalNumber(req.body.sourceOriginalPriceDh);
   if (req.body.featured !== undefined) product.featured = req.body.featured === 'true' || req.body.featured === true;
   if (req.body.active !== undefined) product.active = req.body.active === 'true' || req.body.active === true;
 

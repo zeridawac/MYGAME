@@ -76,7 +76,11 @@ const AdminDashboard = () => {
     promoBadge: '',
     sourceUrl: '',
     sourceProvider: '',
+    sourceCurrency: '',
+    sourcePriceAmount: '',
     sourcePriceDh: '',
+    sourceOriginalPriceAmount: '',
+    sourceOriginalPriceDh: '',
     featured: false,
     active: true,
   });
@@ -280,7 +284,11 @@ const AdminDashboard = () => {
       ...current,
       sourceUrl: '',
       sourceProvider: '',
+      sourceCurrency: '',
+      sourcePriceAmount: '',
       sourcePriceDh: '',
+      sourceOriginalPriceAmount: '',
+      sourceOriginalPriceDh: '',
     }));
   };
 
@@ -309,7 +317,11 @@ const AdminDashboard = () => {
         promoBadge: product.promoBadge || '',
         sourceUrl: product.sourceUrl || temuUrl.trim(),
         sourceProvider: product.sourceProvider || 'temu',
+        sourceCurrency: product.sourceCurrency || '',
+        sourcePriceAmount: product.sourcePriceAmount ?? '',
         sourcePriceDh: product.sourcePriceDh ?? '',
+        sourceOriginalPriceAmount: product.sourceOriginalPriceAmount ?? '',
+        sourceOriginalPriceDh: product.sourceOriginalPriceDh ?? '',
         featured: Boolean(product.featured),
         active: true,
       }));
@@ -351,7 +363,11 @@ const AdminDashboard = () => {
         promoBadge: '',
         sourceUrl: '',
         sourceProvider: '',
+        sourceCurrency: '',
+        sourcePriceAmount: '',
         sourcePriceDh: '',
+        sourceOriginalPriceAmount: '',
+        sourceOriginalPriceDh: '',
         featured: false,
         active: true,
       });
@@ -793,14 +809,50 @@ const AdminDashboard = () => {
                     <div>
                       <strong>{storeForm.title}</strong>
                       <span>
-                        {storeForm.sourcePriceDh ? `${storeForm.sourcePriceDh} DH → ` : ''}
+                        {storeForm.sourcePriceAmount
+                          ? `${storeForm.sourcePriceAmount} ${storeForm.sourceCurrency || 'DH'} → `
+                          : ''}
                         {formatCoins(storeForm.finalPrice || 0)} كوين
                       </span>
-                      <small>{storeForm.promoBadge || 'عرض محدود'} • مخزون {storeForm.stockQuantity}</small>
+                      <small>
+                        {storeForm.sourcePriceDh ? `${storeForm.sourcePriceDh} DH محولة • ` : ''}
+                        {storeForm.promoBadge || 'وصل حديثا'} • مخزون {storeForm.stockQuantity}
+                      </small>
                     </div>
                     <button className="ghost-button table-button" type="button" onClick={clearImportedProduct}>
                       مسح المعاينة
                     </button>
+                  </div>
+                ) : null}
+
+                {importPreview ? (
+                  <div className="store-import-price-grid">
+                    <article>
+                      <span>السعر المستخرج</span>
+                      <strong>
+                        {storeForm.sourcePriceAmount || storeForm.sourcePriceDh} {storeForm.sourceCurrency || 'DH'}
+                      </strong>
+                    </article>
+                    <article>
+                      <span>بعد التحويل</span>
+                      <strong>{storeForm.sourcePriceDh || 0} DH</strong>
+                    </article>
+                    <article>
+                      <span>الأصلي</span>
+                      <strong>
+                        {storeForm.sourceOriginalPriceAmount
+                          ? `${storeForm.sourceOriginalPriceAmount} ${storeForm.sourceCurrency || 'DH'}`
+                          : `${formatCoins(storeForm.originalPrice || 0)} كوين`}
+                      </strong>
+                    </article>
+                    <article>
+                      <span>النهائي</span>
+                      <strong>{formatCoins(storeForm.finalPrice || 0)} كوين</strong>
+                    </article>
+                    <article>
+                      <span>الخصم</span>
+                      <strong>{storeForm.discountPercent || 0}%</strong>
+                    </article>
                   </div>
                 ) : null}
 

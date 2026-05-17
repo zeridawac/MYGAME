@@ -95,14 +95,14 @@ const ProductDetails = () => {
 
         <article className="product-info-panel">
           <div className="product-badges">
-            <span>-{product.discountPercent}%</span>
+            {product.discountPercent > 0 ? <span>-{product.discountPercent}%</span> : null}
             {product.promoBadge || product.featured ? <b>{product.promoBadge || 'مختار'}</b> : null}
             {product.rating ? <b>تقييم {product.rating}</b> : null}
           </div>
           <h2>{product.title}</h2>
           <p>{product.description || 'تفاصيل المنتج ستظهر هنا عند تحديثه من الإدارة.'}</p>
           <div className="product-price-block">
-            <del>{formatCoins(product.originalPrice)} كوين</del>
+            {product.originalPrice > product.finalPrice ? <del>{formatCoins(product.originalPrice)} كوين</del> : null}
             <strong>{formatCoins(product.finalPrice)} كوين</strong>
           </div>
           <div className="product-stock-line">

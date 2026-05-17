@@ -77,7 +77,28 @@ const storeProductSchema = new mongoose.Schema(
       default: '',
       maxlength: 40,
     },
+    sourceCurrency: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 12,
+    },
+    sourcePriceAmount: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
     sourcePriceDh: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    sourceOriginalPriceAmount: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    sourceOriginalPriceDh: {
       type: Number,
       default: null,
       min: 0,

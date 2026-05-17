@@ -14,7 +14,7 @@ const StoreProductCard = ({ product, onAdd }) => (
   <article className="store-product-card">
     <Link className="store-product-image" to={`/store/${product.id}`}>
       <img src={productImageUrl(product)} alt={product.title} />
-      <span className="store-discount-badge">-{product.discountPercent}%</span>
+      {product.discountPercent > 0 ? <span className="store-discount-badge">-{product.discountPercent}%</span> : null}
       {product.promoBadge || product.featured ? (
         <b className="store-hot-badge">{product.promoBadge || 'عرض قوي'}</b>
       ) : null}
@@ -24,7 +24,7 @@ const StoreProductCard = ({ product, onAdd }) => (
         <h3>{product.title}</h3>
       </Link>
       <div className="store-price-row">
-        <del>{formatCoins(product.originalPrice)} كوين</del>
+        {product.originalPrice > product.finalPrice ? <del>{formatCoins(product.originalPrice)} كوين</del> : null}
         <strong>{formatCoins(product.finalPrice)} كوين</strong>
       </div>
       <div className="store-card-bottom">
@@ -36,6 +36,26 @@ const StoreProductCard = ({ product, onAdd }) => (
     </div>
   </article>
 );
+
+const StoreShelf = ({ title, eyebrow, products, onAdd }) => {
+  if (!products.length) return null;
+
+  return (
+    <section className="store-shelf">
+      <div className="section-heading compact-heading">
+        <div>
+          <span className="eyebrow">{eyebrow}</span>
+          <h3>{title}</h3>
+        </div>
+      </div>
+      <div className="store-shelf-row">
+        {products.map((product) => (
+          <StoreProductCard product={product} onAdd={onAdd} key={`${title}-${product.id}`} />
+        ))}
+      </div>
+    </section>
+  );
+};
 
 const Store = () => {
   const [products, setProducts] = useState([]);
@@ -53,6 +73,18 @@ const Store = () => {
     () => (activeCategory ? products.filter((product) => product.category === activeCategory) : products),
     [activeCategory, products]
   );
+  const todayDeals = useMemo(
+    () => [...products].sort((a, b) => b.discountPercent - a.discountPercent).slice(0, 8),
+    [products]
+  );
+  const bestSellers = useMemo(
+    () =>
+      [...products]
+        .sort((a, b) => Number(b.featured) - Number(a.featured) || a.stockQuantity - b.stockQuantity)
+        .slice(0, 8),
+    [products]
+  );
+  const newArrivals = useMemo(() => products.slice(0, 8), [products]);
 
   const loadStore = async () => {
     setLoading(true);
@@ -137,6 +169,10 @@ const Store = () => {
           <span>{formatCoinDh(user?.coins || 0)}</span>
         </article>
       </section>
+
+      <StoreShelf title="الأكثر مبيعاً" eyebrow="Hot" products={bestSellers} onAdd={addToCart} />
+      <StoreShelf title="وصل حديثاً" eyebrow="New" products={newArrivals} onAdd={addToCart} />
+      <StoreShelf title="عروض اليوم" eyebrow="Deals" products={todayDeals} onAdd={addToCart} />
 
       <div className="store-category-row">
         <button className={!activeCategory ? 'active' : ''} type="button" onClick={() => setActiveCategory('')}>
