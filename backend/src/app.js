@@ -15,6 +15,8 @@ const couponRoutes = require('./routes/couponRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const portalChatRoutes = require('./routes/portalChatRoutes');
+const storeRoutes = require('./routes/storeRoutes');
+const adminStoreRoutes = require('./routes/adminStoreRoutes');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -54,6 +56,8 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/portal-chat', portalChatRoutes);
+app.use('/api/store', storeRoutes);
+app.use('/api/admin/store', adminStoreRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/announcements', announcementRoutes);
 

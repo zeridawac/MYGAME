@@ -5,8 +5,11 @@ import {
   Coins,
   FilePlus2,
   Gift,
+  ImagePlus,
   Megaphone,
+  PackageCheck,
   Settings,
+  ShoppingBag,
   ShieldCheck,
   Ticket,
   Trash2,
@@ -18,6 +21,8 @@ import api from '../api/config.js';
 import EmptyState from '../components/EmptyState.jsx';
 import Loading from '../components/Loading.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { formatCoins } from '../utils/coins.js';
+import { productImageUrl } from '../utils/storeImages.js';
 
 const statusLabels = {
   pending: 'قيد المراجعة',
@@ -31,6 +36,7 @@ const tabs = [
   { id: 'announcements', label: 'الإعلانات', icon: Megaphone },
   { id: 'assets', label: 'الأصول', icon: Coins },
   { id: 'coupons', label: 'الهدايا', icon: Gift },
+  { id: 'store', label: 'المتجر', icon: ShoppingBag },
   { id: 'settings', label: 'القيمة', icon: Settings },
   { id: 'activity', label: 'النشاط', icon: Activity },
   { id: 'withdrawals', label: 'السحب', icon: WalletCards },
@@ -45,6 +51,8 @@ const AdminDashboard = () => {
   const [assets, setAssets] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [coupons, setCoupons] = useState([]);
+  const [storeProducts, setStoreProducts] = useState([]);
+  const [storeOrders, setStoreOrders] = useState([]);
   const [activity, setActivity] = useState([]);
   const [inviteForm, setInviteForm] = useState({ code: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
@@ -56,6 +64,20 @@ const AdminDashboard = () => {
     active: true,
     oneTimePerUser: true,
   });
+  const [storeForm, setStoreForm] = useState({
+    title: '',
+    description: '',
+    category: 'منتجات رقمية',
+    originalPrice: '',
+    discountPercent: 30,
+    finalPrice: '',
+    stockQuantity: 10,
+    featured: false,
+    active: true,
+  });
+  const [storeImages, setStoreImages] = useState([]);
+  const [storeEdits, setStoreEdits] = useState({});
+  const [storeEditImages, setStoreEditImages] = useState({});
   const [assetForm, setAssetForm] = useState({
     symbol: '',
     name: '',
@@ -73,8 +95,9 @@ const AdminDashboard = () => {
       pending: withdrawals.filter((item) => item.status === 'pending').length,
       assets: assets.filter((item) => item.isActive).length,
       coupons: coupons.filter((item) => item.active).length,
+      store: storeProducts.filter((item) => item.active).length,
     }),
-    [users, inviteCodes, withdrawals, assets, coupons]
+    [users, inviteCodes, withdrawals, assets, coupons, storeProducts]
   );
 
   const loadAdminData = async () => {
@@ -87,6 +110,8 @@ const AdminDashboard = () => {
         assetsRes,
         withdrawalsRes,
         couponsRes,
+        storeProductsRes,
+        storeOrdersRes,
         activityRes,
       ] = await Promise.all([
         api.get('/admin/users'),
@@ -95,6 +120,8 @@ const AdminDashboard = () => {
         api.get('/admin/assets'),
         api.get('/admin/withdrawals'),
         api.get('/admin/coupons'),
+        api.get('/admin/store/products'),
+        api.get('/admin/store/orders'),
         api.get('/admin/activity'),
       ]);
 
@@ -104,6 +131,8 @@ const AdminDashboard = () => {
       setAssets(assetsRes.data.assets);
       setWithdrawals(withdrawalsRes.data.withdrawals);
       setCoupons(couponsRes.data.coupons);
+      setStoreProducts(storeProductsRes.data.products);
+      setStoreOrders(storeOrdersRes.data.orders);
       setActivity(activityRes.data.activity);
     } catch (error) {
       showToast(error.message, 'error');
@@ -228,6 +257,98 @@ const AdminDashboard = () => {
     }
   };
 
+  const appendStoreFields = (formData, payload) => {
+    Object.entries(payload).forEach(([key, value]) => {
+      formData.append(key, value ?? '');
+    });
+  };
+
+  const createStoreProduct = async (event) => {
+    event.preventDefault();
+    try {
+      const formData = new FormData();
+      appendStoreFields(formData, storeForm);
+      Array.from(storeImages).forEach((file) => formData.append('images', file));
+
+      const { data } = await api.post('/admin/store/products', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setStoreProducts((current) => [data.product, ...current]);
+      setStoreForm({
+        title: '',
+        description: '',
+        category: 'منتجات رقمية',
+        originalPrice: '',
+        discountPercent: 30,
+        finalPrice: '',
+        stockQuantity: 10,
+        featured: false,
+        active: true,
+      });
+      setStoreImages([]);
+      event.target.reset();
+      showToast(data.message, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const setStoreEdit = (productId, field, value) => {
+    setStoreEdits((current) => ({
+      ...current,
+      [productId]: {
+        ...current[productId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateStoreProduct = async (product) => {
+    try {
+      const productId = product.id || product._id;
+      const payload = storeEdits[productId] || {};
+      const files = Array.from(storeEditImages[productId] || []);
+      const requestBody = files.length ? new FormData() : payload;
+      const requestConfig = files.length ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined;
+
+      if (files.length) {
+        appendStoreFields(requestBody, payload);
+        files.forEach((file) => requestBody.append('images', file));
+      }
+
+      const { data } = await api.patch(`/admin/store/products/${productId}`, requestBody, requestConfig);
+      setStoreProducts((current) => current.map((item) => (item.id === data.product.id ? data.product : item)));
+      setStoreEditImages((current) => {
+        const next = { ...current };
+        delete next[productId];
+        return next;
+      });
+      showToast(data.message, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const quickPatchStoreProduct = async (product, patch) => {
+    try {
+      const { data } = await api.patch(`/admin/store/products/${product.id || product._id}`, patch);
+      setStoreProducts((current) => current.map((item) => (item.id === data.product.id ? data.product : item)));
+      showToast(data.message, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const deleteStoreProduct = async (product) => {
+    try {
+      const { data } = await api.delete(`/admin/store/products/${product.id || product._id}`);
+      setStoreProducts((current) => current.filter((item) => item.id !== (product.id || product._id)));
+      showToast(data.message, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
   const setEdit = (userId, field, value) => {
     setUserEdits((current) => ({
       ...current,
@@ -269,6 +390,10 @@ const AdminDashboard = () => {
         <article>
           <strong>{stats.coupons}</strong>
           <span>هدايا نشطة</span>
+        </article>
+        <article>
+          <strong>{stats.store}</strong>
+          <span>منتجات نشطة</span>
         </article>
         <article>
           <strong>{stats.pending}</strong>
@@ -562,6 +687,207 @@ const AdminDashboard = () => {
               ) : (
                 <EmptyState />
               )}
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'store' ? (
+          <div className="admin-section-grid admin-store-grid">
+            <form className="stack-form admin-form" onSubmit={createStoreProduct}>
+              <h3>منتج جديد</h3>
+              <label>
+                <span>عنوان المنتج</span>
+                <input
+                  value={storeForm.title}
+                  onChange={(event) => setStoreForm({ ...storeForm, title: event.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                <span>الوصف</span>
+                <textarea
+                  rows="4"
+                  value={storeForm.description}
+                  onChange={(event) => setStoreForm({ ...storeForm, description: event.target.value })}
+                />
+              </label>
+              <div className="form-two">
+                <label>
+                  <span>التصنيف</span>
+                  <input
+                    value={storeForm.category}
+                    onChange={(event) => setStoreForm({ ...storeForm, category: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>المخزون</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={storeForm.stockQuantity}
+                    onChange={(event) => setStoreForm({ ...storeForm, stockQuantity: event.target.value })}
+                  />
+                </label>
+              </div>
+              <div className="form-two">
+                <label>
+                  <span>السعر الأصلي</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={storeForm.originalPrice}
+                    onChange={(event) => setStoreForm({ ...storeForm, originalPrice: event.target.value })}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>السعر النهائي</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={storeForm.finalPrice}
+                    onChange={(event) => setStoreForm({ ...storeForm, finalPrice: event.target.value })}
+                    required
+                  />
+                </label>
+              </div>
+              <label>
+                <span>نسبة الخصم %</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="95"
+                  value={storeForm.discountPercent}
+                  onChange={(event) => setStoreForm({ ...storeForm, discountPercent: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>صور المنتج</span>
+                <input type="file" accept="image/*" multiple onChange={(event) => setStoreImages(event.target.files)} />
+              </label>
+              <div className="form-two">
+                <label className="switch-line">
+                  <input
+                    type="checkbox"
+                    checked={storeForm.featured}
+                    onChange={(event) => setStoreForm({ ...storeForm, featured: event.target.checked })}
+                  />
+                  <span>منتج مميز</span>
+                </label>
+                <label className="switch-line">
+                  <input
+                    type="checkbox"
+                    checked={storeForm.active}
+                    onChange={(event) => setStoreForm({ ...storeForm, active: event.target.checked })}
+                  />
+                  <span>مفعل</span>
+                </label>
+              </div>
+              <button className="primary-button" type="submit">
+                <ImagePlus size={18} />
+                <span>إضافة المنتج</span>
+              </button>
+            </form>
+
+            <div className="store-admin-stack">
+              <div className="mini-list admin-store-products">
+                {storeProducts.length ? (
+                  storeProducts.map((item) => (
+                    <article key={item.id}>
+                      <img src={productImageUrl(item)} alt={item.title} />
+                      <div className="admin-store-edit-grid">
+                        <input
+                          defaultValue={item.title}
+                          onChange={(event) => setStoreEdit(item.id, 'title', event.target.value)}
+                        />
+                        <input
+                          defaultValue={item.category}
+                          onChange={(event) => setStoreEdit(item.id, 'category', event.target.value)}
+                        />
+                        <input
+                          type="number"
+                          defaultValue={item.originalPrice}
+                          onChange={(event) => setStoreEdit(item.id, 'originalPrice', event.target.value)}
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          max="95"
+                          defaultValue={item.discountPercent}
+                          onChange={(event) => setStoreEdit(item.id, 'discountPercent', event.target.value)}
+                        />
+                        <input
+                          type="number"
+                          defaultValue={item.finalPrice}
+                          onChange={(event) => setStoreEdit(item.id, 'finalPrice', event.target.value)}
+                        />
+                        <input
+                          type="number"
+                          defaultValue={item.stockQuantity}
+                          onChange={(event) => setStoreEdit(item.id, 'stockQuantity', event.target.value)}
+                        />
+                        <textarea
+                          rows="2"
+                          defaultValue={item.description}
+                          onChange={(event) => setStoreEdit(item.id, 'description', event.target.value)}
+                        />
+                        <label className="admin-file-field">
+                          <span>صور إضافية</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(event) =>
+                              setStoreEditImages((current) => ({ ...current, [item.id]: event.target.files }))
+                            }
+                          />
+                        </label>
+                      </div>
+                      <div className="row-actions">
+                        <button className="ghost-button table-button" type="button" onClick={() => updateStoreProduct(item)}>
+                          حفظ
+                        </button>
+                        <button className="ghost-button table-button" type="button" onClick={() => quickPatchStoreProduct(item, { featured: !item.featured })}>
+                          {item.featured ? 'إلغاء التمييز' : 'تمييز'}
+                        </button>
+                        <button className="ghost-button table-button" type="button" onClick={() => quickPatchStoreProduct(item, { active: !item.active })}>
+                          {item.active ? 'تعطيل' : 'تفعيل'}
+                        </button>
+                        <button className="danger-button table-button" type="button" onClick={() => deleteStoreProduct(item)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <EmptyState title="لا توجد منتجات" text="أضف أول منتج للمتجر." />
+                )}
+              </div>
+
+              <div className="panel store-admin-orders">
+                <div className="section-heading compact-heading">
+                  <div>
+                    <span className="eyebrow">الطلبات</span>
+                    <h3>آخر طلبات المتجر</h3>
+                  </div>
+                  <PackageCheck size={20} />
+                </div>
+                {storeOrders.length ? (
+                  <div className="mini-list">
+                    {storeOrders.slice(0, 8).map((order) => (
+                      <article key={order.id}>
+                        <div>
+                          <strong>{order.user?.username || 'مستخدم'}</strong>
+                          <span>{order.items.length} منتج - {new Date(order.createdAt).toLocaleDateString('ar-MA')}</span>
+                        </div>
+                        <strong>{formatCoins(order.totalCoins)} كوين</strong>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState title="لا توجد طلبات" text="طلبات الشراء ستظهر هنا." />
+                )}
+              </div>
             </div>
           </div>
         ) : null}

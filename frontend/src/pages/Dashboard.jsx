@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
-import { BadgeDollarSign, Gift, Wallet } from 'lucide-react';
+import { BadgeDollarSign, Gift, ShoppingBag, Wallet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatCoinDh } from '../utils/coins.js';
 
 const navCards = [
   { to: '/trading', title: 'التداول', text: 'صفقات دقيقة واحدة بالكوينات', icon: BadgeDollarSign },
+  { to: '/store', title: 'المتجر', text: 'تسوق منتجات وعروض بالكوينات فقط', icon: ShoppingBag },
   { to: '/gifts', title: 'الهدايا', text: 'فعّل كوبوناتك وارفع رصيدك', icon: Gift },
 ];
 
@@ -17,7 +18,7 @@ const Dashboard = () => {
         <div>
           <span className="eyebrow">REDA INVEST</span>
           <h2>مرحبا {user?.username}، اختر وجهتك.</h2>
-          <p>واجهة مركزة للتداول والهدايا فقط، مع رصيد كوينات واضح وسريع القراءة.</p>
+          <p>واجهة مركزة للتداول والمتجر والهدايا، مع رصيد كوينات واضح وسريع القراءة.</p>
         </div>
         <div className="user-pill dashboard-balance-pill">
           <Wallet size={18} />

@@ -4,6 +4,7 @@ import {
   Crown,
   Gift,
   LogOut,
+  ShoppingBag,
   ShieldCheck,
 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { formatCoinDh } from '../utils/coins.js';
 
 const baseNav = [
   { to: '/trading', label: 'التداول', icon: BadgeDollarSign },
+  { to: '/store', label: 'المتجر', icon: ShoppingBag },
   { to: '/gifts', label: 'الهدايا', icon: Gift },
 ];
 
