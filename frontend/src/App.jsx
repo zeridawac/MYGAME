@@ -40,7 +40,8 @@ const App = () => {
             >
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/games" element={<Games />} />
-              <Route path="/investments" element={<Investments />} />
+              <Route path="/trading" element={<Investments />} />
+              <Route path="/investments" element={<Navigate to="/trading" replace />} />
               <Route path="/withdrawals" element={<Withdrawals />} />
               <Route path="/bank" element={<BankInfo />} />
               <Route path="/gifts" element={<Gifts />} />

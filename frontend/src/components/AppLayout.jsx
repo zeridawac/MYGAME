@@ -21,7 +21,7 @@ import { formatCoinDh } from '../utils/coins.js';
 const baseNav = [
   { to: '/dashboard', label: 'الرئيسية', icon: CircleGauge },
   { to: '/games', label: 'الألعاب', icon: Gamepad2 },
-  { to: '/investments', label: 'الاستثمار', icon: BadgeDollarSign },
+  { to: '/trading', label: 'التداول', icon: BadgeDollarSign },
   { to: '/gifts', label: 'الهدايا', icon: Gift },
   { to: '/tasks', label: 'المهام', icon: ClipboardCheck },
   { to: '/withdrawals', label: 'السحب', icon: Wallet },

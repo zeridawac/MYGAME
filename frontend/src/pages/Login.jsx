@@ -42,7 +42,7 @@ const Login = () => {
         <div className="auth-brand">
           <span>REDA INVEST GAME</span>
           <h1>دخول المستثمرين</h1>
-          <p>ادخل إلى لوحة عربية محلية لإدارة العملات، الاستثمار، الألعاب والسحب.</p>
+          <p>ادخل إلى لوحة عربية محلية لإدارة العملات، التداول، الألعاب والسحب.</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>

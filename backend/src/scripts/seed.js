@@ -98,7 +98,7 @@ const seed = async () => {
   if (!existingAnnouncement) {
     await Announcement.create({
       title: 'مرحبا بك في REDA INVEST GAME',
-      body: 'ابدأ بجمع العملات، جرّب عجلة الحظ، ثم ابن محفظتك الاستثمارية الافتراضية.',
+      body: 'ابدأ بجمع العملات، جرّب عجلة الحظ، ثم اختبر التداول الافتراضي بدقيقة واحدة.',
       createdBy: admin._id,
     });
   }

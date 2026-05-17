@@ -24,7 +24,7 @@ import { formatCoins, formatDhFromCoins } from '../utils/coins.js';
 
 const navCards = [
   { to: '/games', title: 'الألعاب', text: 'عجلة يومية ومكافآت سريعة', icon: Gamepad2 },
-  { to: '/investments', title: 'الاستثمار', text: 'شراء وبيع أصول افتراضية', icon: LineChart },
+  { to: '/trading', title: 'التداول', text: 'صفقات شراء وبيع افتراضية بدقيقة واحدة', icon: LineChart },
   { to: '/gifts', title: 'الهدايا', text: 'تفعيل كوبونات ومكافآت', icon: Gift },
   { to: '/tasks', title: 'المهام', text: 'اربح نقاطا عبر إنجازات بسيطة', icon: ClipboardCheck },
   { to: '/withdrawals', title: 'السحب', text: 'طلبات سحب العملات', icon: Wallet },
