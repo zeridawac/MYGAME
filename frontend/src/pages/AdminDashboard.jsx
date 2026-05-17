@@ -2,13 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   BadgeCheck,
-  ClipboardCheck,
   Coins,
   FilePlus2,
-  Gamepad2,
   Gift,
   Megaphone,
-  Save,
   Settings,
   ShieldCheck,
   Ticket,
@@ -34,9 +31,6 @@ const tabs = [
   { id: 'announcements', label: 'الإعلانات', icon: Megaphone },
   { id: 'assets', label: 'الأصول', icon: Coins },
   { id: 'coupons', label: 'الهدايا', icon: Gift },
-  { id: 'tasks', label: 'المهام', icon: ClipboardCheck },
-  { id: 'submissions', label: 'المراجعات', icon: BadgeCheck },
-  { id: 'games', label: 'الألعاب', icon: Gamepad2 },
   { id: 'settings', label: 'القيمة', icon: Settings },
   { id: 'activity', label: 'النشاط', icon: Activity },
   { id: 'withdrawals', label: 'السحب', icon: WalletCards },
@@ -51,9 +45,6 @@ const AdminDashboard = () => {
   const [assets, setAssets] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [coupons, setCoupons] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [submissions, setSubmissions] = useState([]);
-  const [gameConfigs, setGameConfigs] = useState([]);
   const [activity, setActivity] = useState([]);
   const [inviteForm, setInviteForm] = useState({ code: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
@@ -61,18 +52,9 @@ const AdminDashboard = () => {
     code: '',
     title: '',
     coins: 0,
-    points: 0,
     usageLimit: 1,
     active: true,
     oneTimePerUser: true,
-  });
-  const [taskForm, setTaskForm] = useState({
-    title: '',
-    description: '',
-    rewardCoins: 0,
-    rewardPoints: 0,
-    link: '',
-    active: true,
   });
   const [assetForm, setAssetForm] = useState({
     symbol: '',
@@ -91,9 +73,8 @@ const AdminDashboard = () => {
       pending: withdrawals.filter((item) => item.status === 'pending').length,
       assets: assets.filter((item) => item.isActive).length,
       coupons: coupons.filter((item) => item.active).length,
-      tasks: tasks.filter((item) => item.active).length,
     }),
-    [users, inviteCodes, withdrawals, assets, coupons, tasks]
+    [users, inviteCodes, withdrawals, assets, coupons]
   );
 
   const loadAdminData = async () => {
@@ -106,9 +87,6 @@ const AdminDashboard = () => {
         assetsRes,
         withdrawalsRes,
         couponsRes,
-        tasksRes,
-        submissionsRes,
-        gameConfigsRes,
         activityRes,
       ] = await Promise.all([
         api.get('/admin/users'),
@@ -117,9 +95,6 @@ const AdminDashboard = () => {
         api.get('/admin/assets'),
         api.get('/admin/withdrawals'),
         api.get('/admin/coupons'),
-        api.get('/admin/tasks'),
-        api.get('/admin/task-submissions'),
-        api.get('/admin/game-configs'),
         api.get('/admin/activity'),
       ]);
 
@@ -129,9 +104,6 @@ const AdminDashboard = () => {
       setAssets(assetsRes.data.assets);
       setWithdrawals(withdrawalsRes.data.withdrawals);
       setCoupons(couponsRes.data.coupons);
-      setTasks(tasksRes.data.tasks);
-      setSubmissions(submissionsRes.data.submissions);
-      setGameConfigs(gameConfigsRes.data.gameConfigs);
       setActivity(activityRes.data.activity);
     } catch (error) {
       showToast(error.message, 'error');
@@ -224,7 +196,6 @@ const AdminDashboard = () => {
         code: '',
         title: '',
         coins: 0,
-        points: 0,
         usageLimit: 1,
         active: true,
         oneTimePerUser: true,
@@ -255,81 +226,6 @@ const AdminDashboard = () => {
     } catch (error) {
       showToast(error.message, 'error');
     }
-  };
-
-  const createTask = async (event) => {
-    event.preventDefault();
-    try {
-      const { data } = await api.post('/admin/tasks', taskForm);
-      setTasks((current) => [data.task, ...current]);
-      setTaskForm({
-        title: '',
-        description: '',
-        rewardCoins: 0,
-        rewardPoints: 0,
-        link: '',
-        active: true,
-      });
-      showToast(data.message, 'success');
-    } catch (error) {
-      showToast(error.message, 'error');
-    }
-  };
-
-  const toggleTask = async (task) => {
-    try {
-      const { data } = await api.patch(`/admin/tasks/${task._id}`, {
-        active: !task.active,
-      });
-      setTasks((current) => current.map((item) => (item._id === task._id ? data.task : item)));
-      showToast(data.message, 'success');
-    } catch (error) {
-      showToast(error.message, 'error');
-    }
-  };
-
-  const deleteTask = async (taskId) => {
-    try {
-      const { data } = await api.delete(`/admin/tasks/${taskId}`);
-      setTasks((current) => current.filter((item) => item._id !== taskId));
-      showToast(data.message, 'success');
-    } catch (error) {
-      showToast(error.message, 'error');
-    }
-  };
-
-  const reviewSubmission = async (submissionId, status) => {
-    try {
-      const { data } = await api.patch(`/admin/task-submissions/${submissionId}`, { status });
-      setSubmissions((current) =>
-        current.map((item) => (item._id === submissionId ? data.submission : item))
-      );
-      showToast(data.message, 'success');
-    } catch (error) {
-      showToast(error.message, 'error');
-    }
-  };
-
-  const updateGameConfig = async (gameConfig) => {
-    try {
-      const { data } = await api.patch(`/admin/game-configs/${gameConfig.gameKey}`, {
-        dailyLimit: gameConfig.dailyLimit,
-        active: gameConfig.active,
-        rewards: gameConfig.rewards,
-      });
-      setGameConfigs((current) =>
-        current.map((item) => (item.gameKey === gameConfig.gameKey ? data.gameConfig : item))
-      );
-      showToast(data.message, 'success');
-    } catch (error) {
-      showToast(error.message, 'error');
-    }
-  };
-
-  const patchGameConfig = (gameKey, patch) => {
-    setGameConfigs((current) =>
-      current.map((item) => (item.gameKey === gameKey ? { ...item, ...patch } : item))
-    );
   };
 
   const setEdit = (userId, field, value) => {
@@ -375,10 +271,6 @@ const AdminDashboard = () => {
           <span>هدايا نشطة</span>
         </article>
         <article>
-          <strong>{stats.tasks}</strong>
-          <span>مهام نشطة</span>
-        </article>
-        <article>
           <strong>{stats.pending}</strong>
           <span>سحب معلق</span>
         </article>
@@ -406,9 +298,6 @@ const AdminDashboard = () => {
                 <tr>
                   <th>المستخدم</th>
                   <th>عملات</th>
-                  <th>نقاط</th>
-                  <th>مستوى</th>
-                  <th>XP</th>
                   <th>حفظ</th>
                 </tr>
               </thead>
@@ -418,11 +307,11 @@ const AdminDashboard = () => {
                     <td>
                       {item.username} {item.isAdmin ? '• مدير' : ''}
                     </td>
-                    {['coins', 'points', 'level', 'xp'].map((field) => (
+                    {['coins'].map((field) => (
                       <td key={field}>
                         <input
                           type="number"
-                          min={field === 'level' ? 1 : 0}
+                          min="0"
                           defaultValue={item[field]}
                           onChange={(event) => setEdit(item._id, field, event.target.value)}
                         />
@@ -617,26 +506,15 @@ const AdminDashboard = () => {
                   onChange={(event) => setCouponForm({ ...couponForm, title: event.target.value })}
                 />
               </label>
-              <div className="form-two">
-                <label>
-                  <span>عملات</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={couponForm.coins}
-                    onChange={(event) => setCouponForm({ ...couponForm, coins: event.target.value })}
-                  />
-                </label>
-                <label>
-                  <span>نقاط</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={couponForm.points}
-                    onChange={(event) => setCouponForm({ ...couponForm, points: event.target.value })}
-                  />
-                </label>
-              </div>
+              <label>
+                <span>عملات</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={couponForm.coins}
+                  onChange={(event) => setCouponForm({ ...couponForm, coins: event.target.value })}
+                />
+              </label>
               <label>
                 <span>حد الاستخدام</span>
                 <input
@@ -668,7 +546,7 @@ const AdminDashboard = () => {
                     <div>
                       <strong>{item.code}</strong>
                       <span>
-                        +{item.coins} عملة / +{item.points} نقطة - {item.usedCount}/{item.usageLimit}
+                        +{item.coins} عملة - {item.usedCount}/{item.usageLimit}
                       </span>
                     </div>
                     <div className="row-actions">
@@ -685,152 +563,6 @@ const AdminDashboard = () => {
                 <EmptyState />
               )}
             </div>
-          </div>
-        ) : null}
-
-        {activeTab === 'tasks' ? (
-          <div className="admin-section-grid">
-            <form className="stack-form admin-form" onSubmit={createTask}>
-              <h3>مهمة جديدة</h3>
-              <label>
-                <span>العنوان</span>
-                <input
-                  value={taskForm.title}
-                  onChange={(event) => setTaskForm({ ...taskForm, title: event.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                <span>الوصف</span>
-                <textarea
-                  rows="4"
-                  value={taskForm.description}
-                  onChange={(event) => setTaskForm({ ...taskForm, description: event.target.value })}
-                  required
-                />
-              </label>
-              <div className="form-two">
-                <label>
-                  <span>عملات</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={taskForm.rewardCoins}
-                    onChange={(event) => setTaskForm({ ...taskForm, rewardCoins: event.target.value })}
-                  />
-                </label>
-                <label>
-                  <span>نقاط</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={taskForm.rewardPoints}
-                    onChange={(event) => setTaskForm({ ...taskForm, rewardPoints: event.target.value })}
-                  />
-                </label>
-              </div>
-              <label>
-                <span>رابط اختياري</span>
-                <input value={taskForm.link} onChange={(event) => setTaskForm({ ...taskForm, link: event.target.value })} />
-              </label>
-              <button className="primary-button" type="submit">
-                <ClipboardCheck size={18} />
-                <span>إنشاء مهمة</span>
-              </button>
-            </form>
-            <div className="mini-list">
-              {tasks.length ? (
-                tasks.map((item) => (
-                  <article key={item._id}>
-                    <div>
-                      <strong>{item.title}</strong>
-                      <span>
-                        +{item.rewardCoins} عملة / +{item.rewardPoints} نقطة
-                      </span>
-                    </div>
-                    <div className="row-actions">
-                      <button className="ghost-button table-button" type="button" onClick={() => toggleTask(item)}>
-                        {item.active ? 'تعطيل' : 'تفعيل'}
-                      </button>
-                      <button className="danger-button table-button" type="button" onClick={() => deleteTask(item._id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <EmptyState />
-              )}
-            </div>
-          </div>
-        ) : null}
-
-        {activeTab === 'submissions' ? (
-          submissions.length ? (
-            <div className="mini-list submission-list">
-              {submissions.map((item) => (
-                <article key={item._id}>
-                  <div>
-                    <strong>
-                      {item.user?.username || 'مستخدم'} - {item.task?.title || 'مهمة'}
-                    </strong>
-                    <span>{item.proofText}</span>
-                    {item.proofImage ? <img src={item.proofImage} alt="إثبات المهمة" /> : null}
-                  </div>
-                  {item.status === 'pending' ? (
-                    <div className="row-actions">
-                      <button className="success-button" type="button" onClick={() => reviewSubmission(item._id, 'approved')}>
-                        <BadgeCheck size={17} />
-                        <span>قبول</span>
-                      </button>
-                      <button className="danger-button" type="button" onClick={() => reviewSubmission(item._id, 'rejected')}>
-                        <XCircle size={17} />
-                        <span>رفض</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <span className={`status-badge status-${item.status}`}>
-                      {statusLabels[item.status] || item.status}
-                    </span>
-                  )}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="لا توجد إرسالات" text="إثباتات المهام ستظهر هنا." />
-          )
-        ) : null}
-
-        {activeTab === 'games' ? (
-          <div className="mini-list">
-            {gameConfigs.map((item) => (
-              <article key={item.gameKey}>
-                <div>
-                  <strong>{item.nameAr}</strong>
-                  <span>{item.rewards?.length || 0} مكافآت</span>
-                </div>
-                <div className="game-config-actions">
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.dailyLimit}
-                    onChange={(event) => patchGameConfig(item.gameKey, { dailyLimit: event.target.value })}
-                  />
-                  <label className="switch-line compact-switch">
-                    <input
-                      type="checkbox"
-                      checked={item.active}
-                      onChange={(event) => patchGameConfig(item.gameKey, { active: event.target.checked })}
-                    />
-                    <span>نشطة</span>
-                  </label>
-                  <button className="ghost-button table-button" type="button" onClick={() => updateGameConfig(item)}>
-                    <Save size={16} />
-                    <span>حفظ</span>
-                  </button>
-                </div>
-              </article>
-            ))}
           </div>
         ) : null}
 
@@ -856,13 +588,12 @@ const AdminDashboard = () => {
                   </div>
                   <div>
                     <strong>{item.coins >= 0 ? '+' : ''}{item.coins} عملة</strong>
-                    <span>{item.points >= 0 ? '+' : ''}{item.points} نقطة</span>
                   </div>
                 </article>
               ))}
             </div>
           ) : (
-            <EmptyState title="لا يوجد نشاط" text="حركة الألعاب والهدايا والمهام ستظهر هنا." />
+            <EmptyState title="لا يوجد نشاط" text="حركة التداول والهدايا ستظهر هنا." />
           )
         ) : null}
 

@@ -55,7 +55,7 @@ const Gifts = () => {
       <section className="hero-panel compact-hero gift-hero">
         <div>
           <span className="eyebrow">الهدايا</span>
-          <h2>أدخل كوبون الهدية واحصل على العملات أو النقاط فورا.</h2>
+          <h2>أدخل كوبون الهدية واحصل على العملات فورا.</h2>
           <p>الكوبونات قد تكون محدودة الاستخدام أو مرة واحدة لكل مستخدم حسب إعداد الإدارة.</p>
         </div>
         <Gift size={48} />
@@ -104,7 +104,6 @@ const Gifts = () => {
                   </div>
                   <div>
                     <strong>+{item.coins} عملة</strong>
-                    <span>+{item.points} نقطة</span>
                   </div>
                 </article>
               ))}

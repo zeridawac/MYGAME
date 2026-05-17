@@ -4,7 +4,6 @@ import {
   Clock3,
   Coins,
   RefreshCw,
-  ShieldCheck,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -51,24 +50,24 @@ const directionMeta = {
 };
 
 const TradingChart = ({ candles = [], currentPrice }) => {
-  const visibleCandles = candles.slice(-62);
+  const visibleCandles = candles.slice(-76);
   const hasData = visibleCandles.length > 1;
 
   if (!hasData) {
     return (
       <div className="binary-chart-empty">
         <Activity size={26} />
-        <span>جاري بناء الشارت الافتراضي...</span>
+        <span>جاري تجهيز الشارت...</span>
       </div>
     );
   }
 
-  const width = 980;
-  const height = 360;
-  const chartTop = 20;
-  const chartHeight = 270;
-  const volumeTop = 310;
-  const volumeHeight = 34;
+  const width = 1040;
+  const height = 390;
+  const chartTop = 22;
+  const chartHeight = 292;
+  const volumeTop = 334;
+  const volumeHeight = 38;
   const highs = visibleCandles.map((item) => Number(item.high));
   const lows = visibleCandles.map((item) => Number(item.low));
   const maxPrice = Math.max(...highs, Number(currentPrice || 0));
@@ -76,10 +75,13 @@ const TradingChart = ({ candles = [], currentPrice }) => {
   const priceRange = Math.max(1, maxPrice - minPrice);
   const maxVolume = Math.max(...visibleCandles.map((item) => Number(item.volume || 0)), 1);
   const spacing = width / visibleCandles.length;
-  const candleWidth = Math.max(5, Math.min(13, spacing * 0.55));
+  const candleWidth = Math.max(4, Math.min(11, spacing * 0.64));
   const yForPrice = (price) => chartTop + ((maxPrice - Number(price)) / priceRange) * chartHeight;
   const xForIndex = (index) => index * spacing + spacing / 2;
-  const grid = Array.from({ length: 5 }, (_, index) => minPrice + (priceRange / 4) * index);
+  const grid = Array.from({ length: 6 }, (_, index) => minPrice + (priceRange / 5) * index);
+  const verticalGrid = Array.from({ length: 9 }, (_, index) => (width / 8) * index);
+  const supportPrice = minPrice + priceRange * 0.22;
+  const resistancePrice = minPrice + priceRange * 0.78;
 
   const linePath = visibleCandles
     .map((candle, index) => `${index === 0 ? 'M' : 'L'} ${xForIndex(index)} ${yForPrice(candle.close)}`)
@@ -88,7 +90,7 @@ const TradingChart = ({ candles = [], currentPrice }) => {
 
   return (
     <div className="binary-chart-shell">
-      <svg className="binary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="شارت تداول افتراضي">
+      <svg className="binary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="شارت تداول">
         <defs>
           <linearGradient id="binaryAreaGlow" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="rgba(46, 229, 157, 0.24)" />
@@ -103,12 +105,16 @@ const TradingChart = ({ candles = [], currentPrice }) => {
           </filter>
         </defs>
 
+        {verticalGrid.map((x) => (
+          <line className="binary-grid-line binary-grid-vertical" x1={x} x2={x} y1={chartTop} y2={volumeTop + volumeHeight} key={x} />
+        ))}
+
         {grid.map((price) => {
           const y = yForPrice(price);
           return (
             <g key={price}>
               <line className="binary-grid-line" x1="0" x2={width} y1={y} y2={y} />
-              <text className="binary-grid-label" x="958" y={y - 7} textAnchor="end">
+              <text className="binary-grid-label" x="1014" y={y - 7} textAnchor="end">
                 {formatPrice(price)}
               </text>
             </g>
@@ -132,15 +138,25 @@ const TradingChart = ({ candles = [], currentPrice }) => {
           return (
             <g className={`binary-candle ${up ? 'is-up' : 'is-down'}`} key={`${candle.time}-${index}`}>
               <line className="binary-candle-wick" x1={x} x2={x} y1={yHigh} y2={yLow} />
-              <rect className="binary-candle-body" x={x - candleWidth / 2} y={bodyY} width={candleWidth} height={bodyHeight} rx="2" />
+              <rect className="binary-candle-body" x={x - candleWidth / 2} y={bodyY} width={candleWidth} height={bodyHeight} rx="1.8" />
               <rect className="binary-volume-bar" x={x - candleWidth / 2} y={volumeTop + volumeHeight - renderedVolume} width={candleWidth} height={renderedVolume} rx="2" />
             </g>
           );
         })}
 
+        <line className="binary-zone-line binary-zone-resistance" x1="0" x2={width} y1={yForPrice(resistancePrice)} y2={yForPrice(resistancePrice)} />
+        <line className="binary-zone-line binary-zone-support" x1="0" x2={width} y1={yForPrice(supportPrice)} y2={yForPrice(supportPrice)} />
+        <text className="binary-zone-label" x="26" y={yForPrice(resistancePrice) - 8}>
+          مقاومة
+        </text>
+        <text className="binary-zone-label" x="26" y={yForPrice(supportPrice) - 8}>
+          دعم
+        </text>
+
         <line className="binary-current-line" x1="0" x2={width} y1={currentY} y2={currentY} />
-        <rect className="binary-price-tag-bg" x="824" y={currentY - 18} width="144" height="28" rx="10" />
-        <text className="binary-price-tag" x="896" y={currentY + 1} textAnchor="middle">
+        <circle className="binary-live-dot" cx={xForIndex(visibleCandles.length - 1)} cy={currentY} r="7" />
+        <rect className="binary-price-tag-bg" x="872" y={currentY - 18} width="146" height="28" rx="10" />
+        <text className="binary-price-tag" x="945" y={currentY + 1} textAnchor="middle">
           {formatPrice(currentPrice)}
         </text>
       </svg>
@@ -275,7 +291,7 @@ const Investments = () => {
   }, [loadTrades]);
 
   useEffect(() => {
-    const marketInterval = window.setInterval(loadMarket, 1500);
+    const marketInterval = window.setInterval(loadMarket, 1000);
     return () => window.clearInterval(marketInterval);
   }, [loadMarket]);
 
@@ -341,9 +357,9 @@ const Investments = () => {
     <div className="page-stack trading-page">
       <section className="hero-panel compact-hero trading-hero">
         <div>
-          <span className="eyebrow">تداول افتراضي</span>
+          <span className="eyebrow">غرفة التداول</span>
           <h2>التداول</h2>
-          <p>سوق محاكى بالكامل، صفقات دقيقة واحدة، ونتائج تعتمد على حركة سعر وهمية داخل اللعبة فقط.</p>
+          <p>راقب حركة السعر، اختر الاتجاه، وافتح صفقات دقيقة واحدة باستخدام رصيد الكوينات.</p>
         </div>
         <button className="ghost-button trading-refresh" type="button" onClick={() => loadTrades()} disabled={refreshing}>
           <RefreshCw size={18} className={refreshing ? 'spin-icon' : ''} />
@@ -354,7 +370,7 @@ const Investments = () => {
       <section className="trading-balance-strip">
         <StatPill icon={Wallet} label="رصيدك" value={formatCoinDh(user?.coins || 0)} tone="gold" />
         <StatPill icon={Activity} label="الأصل" value={market?.asset?.symbol || 'RDA/DH'} tone="cyan" />
-        <StatPill icon={ShieldCheck} label="الأمان" value="افتراضي فقط" tone="green" />
+        <StatPill icon={Coins} label="العائد" value="75%" tone="green" />
       </section>
 
       {resultNotice ? (
@@ -375,21 +391,21 @@ const Investments = () => {
         <div className="trading-chart-panel">
           <div className="trading-chart-head">
             <div>
-              <span>{market?.asset?.nameAr || 'ريدا درهم الافتراضي'}</span>
+              <span>{market?.asset?.nameAr || 'ريدا درهم'}</span>
               <h3>{market?.asset?.symbol || 'RDA/DH'}</h3>
             </div>
             <div className="trading-live-price">
               <strong>{formatPrice(currentPrice)}</strong>
-              <span>سعر مباشر محاكى</span>
+              <span>السعر الحالي</span>
             </div>
           </div>
 
           <TradingChart candles={market?.candles || []} currentPrice={currentPrice} />
 
           <div className="trading-chart-footer">
-            <span>تذبذب وهمي</span>
-            <span>ضخ وسحب عشوائي</span>
-            <span>لا توجد بيانات حقيقية</span>
+            <span>سيولة متغيرة</span>
+            <span>مناطق دعم ومقاومة</span>
+            <span>حركة لحظية</span>
           </div>
         </div>
 
@@ -457,7 +473,7 @@ const Investments = () => {
           </button>
 
           <p className="trading-safety-note">
-            هذه تجربة افتراضية داخل اللعبة فقط. لا توجد أموال حقيقية، لا إيداع، ولا اتصال بأي وسيط خارجي.
+            اختر المبلغ والاتجاه بعناية قبل فتح الصفقة. النتيجة تحسم عند نهاية الدقيقة.
           </p>
         </aside>
       </section>

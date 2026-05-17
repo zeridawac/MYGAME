@@ -8,8 +8,8 @@ const PAYOUT_MULTIPLIER = 1.75;
 const MIN_TRADE_AMOUNT = 10;
 const ASSET = {
   symbol: 'RDA/DH',
-  nameAr: 'ريدا درهم الافتراضي',
-  name: 'REDA Virtual Dirham',
+  nameAr: 'ريدا درهم',
+  name: 'REDA Dirham',
 };
 
 const roundPrice = (value) => Math.round(value * 10000) / 10000;
@@ -20,33 +20,70 @@ const pseudoRandom = (seed) => {
   return value - Math.floor(value);
 };
 
-const getSimulatedPrice = (timestamp = Date.now()) => {
-  const second = Math.floor(timestamp / 1000);
-  const base = 100;
-  const slowTrend = Math.sin(second / 47) * 5.8;
-  const mediumWave = Math.sin(second / 13) * 2.4;
-  const fastWave = Math.sin(second / 4.2) * 0.95;
-  const microNoise = (pseudoRandom(second) - 0.5) * 1.15;
-  const spikeRoll = pseudoRandom(Math.floor(second / 11) + 777);
-  const spike = spikeRoll > 0.965 ? (pseudoRandom(second + 99) > 0.5 ? 4.2 : -4.2) : 0;
+const interpolate = (from, to, amount) => from + (to - from) * amount;
 
-  return roundPrice(Math.max(10, base + slowTrend + mediumWave + fastWave + microNoise + spike));
+const smoothNoise = (value, seed = 0) => {
+  const floor = Math.floor(value);
+  const fraction = value - floor;
+  const eased = fraction * fraction * (3 - 2 * fraction);
+  return interpolate(pseudoRandom(floor + seed), pseudoRandom(floor + 1 + seed), eased) - 0.5;
 };
 
-const buildCandles = (now = Date.now(), count = 72, intervalMs = 5000) => {
+const spikePulse = (timestamp, windowSeconds, seed, strength) => {
+  const second = timestamp / 1000;
+  const windowIndex = Math.floor(second / windowSeconds);
+  const phase = (second % windowSeconds) / windowSeconds;
+  const roll = pseudoRandom(windowIndex + seed);
+
+  if (roll < 0.9) return 0;
+
+  const direction = pseudoRandom(windowIndex + seed + 31) > 0.5 ? 1 : -1;
+  const pulse = Math.sin(Math.PI * phase);
+  const pullback = phase > 0.54 ? Math.sin(Math.PI * (phase - 0.54) / 0.46) * -0.42 : 0;
+
+  return direction * strength * (pulse + pullback);
+};
+
+const getSimulatedPrice = (timestamp = Date.now()) => {
+  const second = timestamp / 1000;
+  const channelCenter = 100 + Math.sin(second / 138) * 3.8 + Math.sin(second / 41) * 1.15;
+  const support = channelCenter - 7.4 - Math.sin(second / 95) * 0.75;
+  const resistance = channelCenter + 7.4 + Math.cos(second / 91) * 0.75;
+  const trend = Math.sin(second / 54) * 3.2 + Math.sin(second / 19) * 1.55;
+  const momentum = Math.sin(second / 6.6) * 0.85 + smoothNoise(second / 2.4, 901) * 1.15;
+  const liquiditySweep = spikePulse(timestamp, 18, 2100, 4.6) + spikePulse(timestamp, 31, 4100, 6.2);
+  let price = channelCenter + trend + momentum + liquiditySweep;
+
+  if (price > resistance) {
+    price -= (price - resistance) * 0.62;
+  }
+
+  if (price < support) {
+    price += (support - price) * 0.62;
+  }
+
+  price += smoothNoise(second / 0.95, 1777) * 0.42;
+
+  return roundPrice(Math.max(10, price));
+};
+
+const buildCandles = (now = Date.now(), count = 96, intervalMs = 2500) => {
   const alignedNow = Math.floor(now / intervalMs) * intervalMs;
   const candles = [];
 
   for (let index = count - 1; index >= 0; index -= 1) {
     const start = alignedNow - index * intervalMs;
-    const open = getSimulatedPrice(start);
-    const midA = getSimulatedPrice(start + intervalMs * 0.33);
-    const midB = getSimulatedPrice(start + intervalMs * 0.66);
-    const close = getSimulatedPrice(start + intervalMs);
-    const shadow = (pseudoRandom(Math.floor(start / 1000) + 404) + 0.18) * 0.55;
-    const high = roundPrice(Math.max(open, midA, midB, close) + shadow);
-    const low = roundPrice(Math.max(1, Math.min(open, midA, midB, close) - shadow));
-    const volume = Math.round(800 + pseudoRandom(Math.floor(start / 1000) + 909) * 7200);
+    const samples = Array.from({ length: 8 }, (_, sampleIndex) =>
+      getSimulatedPrice(start + (intervalMs / 7) * sampleIndex)
+    );
+    const open = samples[0];
+    const close = samples[samples.length - 1];
+    const range = Math.max(...samples) - Math.min(...samples);
+    const shadow = 0.1 + pseudoRandom(Math.floor(start / 1000) + 404) * 0.34 + range * 0.12;
+    const high = roundPrice(Math.max(...samples) + shadow);
+    const low = roundPrice(Math.max(1, Math.min(...samples) - shadow));
+    const impulse = Math.abs(close - open) + range;
+    const volume = Math.round(1400 + impulse * 1800 + pseudoRandom(Math.floor(start / 1000) + 909) * 5200);
 
     candles.push({
       time: new Date(start).toISOString(),

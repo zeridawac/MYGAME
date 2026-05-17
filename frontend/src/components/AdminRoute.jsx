@@ -5,7 +5,7 @@ const AdminRoute = ({ children }) => {
   const { user } = useAuth();
 
   if (!user?.isAdmin) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/trading" replace />;
   }
 
   return children;

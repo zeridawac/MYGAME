@@ -13,7 +13,7 @@ const Login = () => {
   const location = useLocation();
 
   if (isAuthenticated) {
-    return <Navigate to={user?.isAdmin ? '/admin' : '/dashboard'} replace />;
+    return <Navigate to={user?.isAdmin ? '/admin' : '/trading'} replace />;
   }
 
   const handleSubmit = async (event) => {
@@ -23,7 +23,11 @@ const Login = () => {
     try {
       const nextUser = await login(form);
       showToast('تم تسجيل الدخول بنجاح', 'success');
-      navigate(nextUser.isAdmin ? '/admin' : location.state?.from?.pathname || '/dashboard', {
+      const targetPath = location.state?.from?.pathname;
+      const safeTarget = targetPath && !['/games', '/tasks', '/withdrawals', '/bank', '/dashboard'].includes(targetPath)
+        ? targetPath
+        : '/trading';
+      navigate(nextUser.isAdmin ? '/admin' : safeTarget, {
         replace: true,
       });
     } catch (error) {
@@ -42,7 +46,7 @@ const Login = () => {
         <div className="auth-brand">
           <span>REDA INVEST GAME</span>
           <h1>دخول المستثمرين</h1>
-          <p>ادخل إلى لوحة عربية محلية لإدارة العملات، التداول، الألعاب والسحب.</p>
+          <p>ادخل إلى منصة عربية مركزة للتداول والهدايا وإدارة رصيد الكوينات.</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>

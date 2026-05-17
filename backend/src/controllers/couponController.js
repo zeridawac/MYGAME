@@ -36,7 +36,6 @@ const redeemCoupon = asyncHandler(async (req, res) => {
   }
 
   req.user.coins += coupon.coins;
-  req.user.points += coupon.points;
   coupon.usedCount += 1;
 
   const redemption = await CouponRedemption.create({
@@ -44,7 +43,7 @@ const redeemCoupon = asyncHandler(async (req, res) => {
     coupon: coupon._id,
     code: coupon.code,
     coins: coupon.coins,
-    points: coupon.points,
+    points: 0,
   });
 
   await Promise.all([req.user.save(), coupon.save()]);
@@ -53,7 +52,7 @@ const redeemCoupon = asyncHandler(async (req, res) => {
     type: 'coupon',
     title: `هدية ${coupon.code}`,
     coins: coupon.coins,
-    points: coupon.points,
+    points: 0,
     metadata: { coupon: coupon._id },
   });
 

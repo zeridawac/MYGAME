@@ -2646,7 +2646,7 @@ label {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 238px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -2658,7 +2658,9 @@ label {
   gap: 1.25rem;
   padding: 1.1rem;
   border-left: 1px solid var(--border);
-  background: rgba(8, 11, 16, 0.78);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+    rgba(8, 11, 16, 0.86);
   backdrop-filter: blur(18px);
 }
 
@@ -2728,7 +2730,8 @@ label {
 .sidebar-nav a.active,
 .mobile-nav a.active {
   color: var(--text);
-  background: rgba(62, 226, 197, 0.12);
+  background: linear-gradient(135deg, rgba(62, 226, 197, 0.16), rgba(112, 167, 255, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(62, 226, 197, 0.12);
 }
 
 .logout-button {
@@ -4333,7 +4336,7 @@ th {
     left: 0.7rem;
     z-index: 50;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
     gap: 0.25rem;
     padding: 0.45rem;
     border: 1px solid var(--border);
@@ -5019,12 +5022,16 @@ body:has(.games-page) {
   overflow: hidden;
   width: 100%;
   height: clamp(260px, 72vw, 390px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.095);
   border-radius: var(--radius);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
-    radial-gradient(circle at 50% 0%, rgba(112, 167, 255, 0.11), transparent 42%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)),
+    radial-gradient(circle at 68% 0%, rgba(62, 226, 197, 0.14), transparent 38%),
     #070b11;
+  background-size: 56px 56px, 56px 56px, auto, auto, auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -32px 80px rgba(0, 0, 0, 0.18);
 }
 
 .binary-chart {
@@ -5034,8 +5041,12 @@ body:has(.games-page) {
 }
 
 .binary-grid-line {
-  stroke: rgba(255, 255, 255, 0.075);
+  stroke: rgba(255, 255, 255, 0.068);
   stroke-width: 1;
+}
+
+.binary-grid-vertical {
+  stroke: rgba(255, 255, 255, 0.04);
 }
 
 .binary-grid-label {
@@ -5049,8 +5060,8 @@ body:has(.games-page) {
 
 .binary-price-line {
   fill: none;
-  stroke: rgba(62, 226, 197, 0.68);
-  stroke-width: 3;
+  stroke: rgba(62, 226, 197, 0.42);
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -5062,15 +5073,16 @@ body:has(.games-page) {
 .binary-candle-wick,
 .binary-candle-body,
 .binary-volume-bar {
-  transition: fill 220ms ease, stroke 220ms ease, height 220ms ease, y 220ms ease;
+  transition: fill 260ms ease, stroke 260ms ease, height 260ms ease, y 260ms ease, opacity 260ms ease;
 }
 
 .binary-candle.is-up .binary-candle-wick {
-  stroke: rgba(46, 229, 157, 0.82);
+  stroke: rgba(46, 229, 157, 0.86);
 }
 
 .binary-candle.is-up .binary-candle-body {
-  fill: rgba(46, 229, 157, 0.9);
+  fill: rgba(46, 229, 157, 0.94);
+  filter: drop-shadow(0 0 5px rgba(46, 229, 157, 0.22));
 }
 
 .binary-candle.is-up .binary-volume-bar {
@@ -5078,11 +5090,12 @@ body:has(.games-page) {
 }
 
 .binary-candle.is-down .binary-candle-wick {
-  stroke: rgba(255, 92, 112, 0.82);
+  stroke: rgba(255, 92, 112, 0.86);
 }
 
 .binary-candle.is-down .binary-candle-body {
-  fill: rgba(255, 92, 112, 0.9);
+  fill: rgba(255, 92, 112, 0.94);
+  filter: drop-shadow(0 0 5px rgba(255, 92, 112, 0.2));
 }
 
 .binary-candle.is-down .binary-volume-bar {
@@ -5090,14 +5103,40 @@ body:has(.games-page) {
 }
 
 .binary-current-line {
-  stroke: rgba(247, 201, 72, 0.68);
-  stroke-dasharray: 7 7;
+  stroke: rgba(247, 201, 72, 0.78);
+  stroke-dasharray: 8 7;
   stroke-width: 1.5;
 }
 
+.binary-zone-line {
+  stroke-dasharray: 12 8;
+  stroke-width: 1.25;
+}
+
+.binary-zone-resistance {
+  stroke: rgba(255, 92, 112, 0.32);
+}
+
+.binary-zone-support {
+  stroke: rgba(46, 229, 157, 0.32);
+}
+
+.binary-zone-label {
+  fill: rgba(245, 247, 251, 0.62);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.binary-live-dot {
+  fill: #fff5bd;
+  stroke: rgba(247, 201, 72, 0.38);
+  stroke-width: 8;
+  animation: liveDotPulse 1100ms ease-in-out infinite;
+}
+
 .binary-price-tag-bg {
-  fill: rgba(247, 201, 72, 0.16);
-  stroke: rgba(247, 201, 72, 0.32);
+  fill: rgba(247, 201, 72, 0.18);
+  stroke: rgba(247, 201, 72, 0.38);
 }
 
 .binary-price-tag {
@@ -5455,6 +5494,19 @@ body:has(.games-page) {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes liveDotPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    stroke-width: 5;
+  }
+
+  50% {
+    opacity: 1;
+    stroke-width: 13;
   }
 }
 

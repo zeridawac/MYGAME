@@ -6,9 +6,7 @@ const InviteCode = require('../models/InviteCode');
 const Asset = require('../models/Asset');
 const Announcement = require('../models/Announcement');
 const Coupon = require('../models/Coupon');
-const Task = require('../models/Task');
-const GameConfig = require('../models/GameConfig');
-const { defaultAssets, defaultGameConfigs } = require('../utils/defaultData');
+const { defaultAssets } = require('../utils/defaultData');
 const { setCoinRate } = require('../utils/settings');
 
 dotenv.config();
@@ -27,8 +25,8 @@ const seed = async () => {
   admin.password = 'admin123456';
   admin.isAdmin = true;
   admin.coins = 10000;
-  admin.points = 5000;
-  admin.level = 10;
+  admin.points = 0;
+  admin.level = 1;
   admin.xp = 0;
   admin.streak = 1;
   admin.lastLoginDate = new Date();
@@ -55,16 +53,6 @@ const seed = async () => {
     )
   );
 
-  await Promise.all(
-    defaultGameConfigs.map((config) =>
-      GameConfig.findOneAndUpdate(
-        { gameKey: config.gameKey },
-        { $setOnInsert: config },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      )
-    )
-  );
-
   await setCoinRate(1000);
 
   await Coupon.findOneAndUpdate(
@@ -73,7 +61,7 @@ const seed = async () => {
       code: 'WELCOME600',
       title: 'هدية البداية',
       coins: 600,
-      points: 60,
+      points: 0,
       usageLimit: 100,
       active: true,
       oneTimePerUser: true,
@@ -82,23 +70,11 @@ const seed = async () => {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  const existingTask = await Task.findOne({ title: 'تابع إعلان البداية' });
-  if (!existingTask) {
-    await Task.create({
-      title: 'تابع إعلان البداية',
-      description: 'اكتب رسالة قصيرة تؤكد أنك قرأت إعلان البداية وفهمت طريقة اللعب.',
-      rewardCoins: 120,
-      rewardPoints: 80,
-      active: true,
-      createdBy: admin._id,
-    });
-  }
-
   const existingAnnouncement = await Announcement.findOne({ title: 'مرحبا بك في REDA INVEST GAME' });
   if (!existingAnnouncement) {
     await Announcement.create({
       title: 'مرحبا بك في REDA INVEST GAME',
-      body: 'ابدأ بجمع العملات، جرّب عجلة الحظ، ثم اختبر التداول الافتراضي بدقيقة واحدة.',
+      body: 'ابدأ بجمع العملات، ثم اختبر التداول بدقيقة واحدة من واجهة مركزة وسريعة.',
       createdBy: admin._id,
     });
   }

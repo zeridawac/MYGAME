@@ -37,9 +37,6 @@ const updateUserStats = asyncHandler(async (req, res) => {
   }
 
   user.coins = toNumberOrCurrent(req.body.coins, user.coins);
-  user.points = toNumberOrCurrent(req.body.points, user.points);
-  user.level = toNumberOrCurrent(req.body.level, user.level, 1);
-  user.xp = toNumberOrCurrent(req.body.xp, user.xp);
   user.streak = toNumberOrCurrent(req.body.streak, user.streak);
 
   await user.save();
@@ -240,10 +237,9 @@ const createCoupon = asyncHandler(async (req, res) => {
   const code = String(req.body.code || '').trim().toUpperCase();
   const title = String(req.body.title || '').trim();
   const coins = Number(req.body.coins || 0);
-  const points = Number(req.body.points || 0);
   const usageLimit = Number(req.body.usageLimit || 1);
 
-  if (!code || (!coins && !points) || usageLimit < 1) {
+  if (!code || !coins || usageLimit < 1) {
     res.status(400);
     throw new Error('بيانات الكوبون غير مكتملة');
   }
@@ -252,7 +248,7 @@ const createCoupon = asyncHandler(async (req, res) => {
     code,
     title,
     coins,
-    points,
+    points: 0,
     usageLimit,
     active: req.body.active !== false,
     oneTimePerUser: req.body.oneTimePerUser !== false,
@@ -276,7 +272,7 @@ const updateCoupon = asyncHandler(async (req, res) => {
   if (req.body.code !== undefined) coupon.code = String(req.body.code).trim().toUpperCase();
   if (req.body.title !== undefined) coupon.title = String(req.body.title).trim();
   if (req.body.coins !== undefined) coupon.coins = Math.max(0, Number(req.body.coins));
-  if (req.body.points !== undefined) coupon.points = Math.max(0, Number(req.body.points));
+  coupon.points = 0;
   if (req.body.usageLimit !== undefined) coupon.usageLimit = Math.max(1, Number(req.body.usageLimit));
   if (req.body.active !== undefined) coupon.active = Boolean(req.body.active);
   if (req.body.oneTimePerUser !== undefined) coupon.oneTimePerUser = Boolean(req.body.oneTimePerUser);

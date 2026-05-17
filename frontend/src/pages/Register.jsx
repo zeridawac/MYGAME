@@ -12,7 +12,7 @@ const Register = () => {
   const navigate = useNavigate();
 
   if (isAuthenticated) {
-    return <Navigate to={user?.isAdmin ? '/admin' : '/dashboard'} replace />;
+    return <Navigate to={user?.isAdmin ? '/admin' : '/trading'} replace />;
   }
 
   const handleSubmit = async (event) => {
@@ -22,7 +22,7 @@ const Register = () => {
     try {
       await register(form);
       showToast('تم إنشاء الحساب بنجاح', 'success');
-      navigate('/dashboard', { replace: true });
+      navigate('/trading', { replace: true });
     } catch (error) {
       showToast(error.message, 'error');
     } finally {
