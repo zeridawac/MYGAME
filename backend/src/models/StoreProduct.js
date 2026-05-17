@@ -53,6 +53,35 @@ const storeProductSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    rating: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 5,
+    },
+    promoBadge: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 80,
+    },
+    sourceUrl: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 1200,
+    },
+    sourceProvider: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 40,
+    },
+    sourcePriceDh: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
     featured: {
       type: Boolean,
       default: false,

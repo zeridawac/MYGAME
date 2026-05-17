@@ -15,7 +15,9 @@ const StoreProductCard = ({ product, onAdd }) => (
     <Link className="store-product-image" to={`/store/${product.id}`}>
       <img src={productImageUrl(product)} alt={product.title} />
       <span className="store-discount-badge">-{product.discountPercent}%</span>
-      {product.featured ? <b className="store-hot-badge">عرض قوي</b> : null}
+      {product.promoBadge || product.featured ? (
+        <b className="store-hot-badge">{product.promoBadge || 'عرض قوي'}</b>
+      ) : null}
     </Link>
     <div className="store-product-body">
       <Link to={`/store/${product.id}`}>

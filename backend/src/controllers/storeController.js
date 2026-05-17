@@ -8,6 +8,8 @@ const StoreProduct = require('../models/StoreProduct');
 
 const STORE_UPLOAD_BASE = '/uploads/store-products';
 const STORE_UPLOAD_ROOT = path.join(process.cwd(), 'uploads', 'store-products');
+const TEMU_IMPORT_ERROR = 'تعذر جلب بيانات المنتج';
+const DH_TO_COINS = 10;
 
 const starterProducts = [
   {
@@ -94,6 +96,299 @@ const normalizeNumber = (value, fallback = 0) => {
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
+const decodeHtml = (value = '') =>
+  String(value)
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const stripTemuTitle = (value = '') =>
+  decodeHtml(value)
+    .replace(/\s*[-|]\s*Temu.*$/i, '')
+    .replace(/^Temu\s*[-|]\s*/i, '')
+    .trim();
+
+const sanitizeImageUrl = (url = '') => {
+  const cleanUrl = decodeHtml(String(url).replace(/\\u002F/g, '/').replace(/\\\//g, '/')).trim();
+  try {
+    const parsed = new URL(cleanUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+};
+
+const unique = (items) => [...new Set(items.filter(Boolean))];
+
+const parseMetaValues = (html, keys) => {
+  const values = [];
+  for (const key of keys) {
+    const pattern = new RegExp(
+      `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${key}["'][^>]*>`,
+      'gi'
+    );
+    let match = pattern.exec(html);
+    while (match) {
+      values.push(decodeHtml(match[1] || match[2] || ''));
+      match = pattern.exec(html);
+    }
+  }
+
+  return values;
+};
+
+const parseJsonSafely = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const walkJson = (value, visitor) => {
+  if (!value || typeof value !== 'object') return;
+  visitor(value);
+  if (Array.isArray(value)) {
+    value.forEach((item) => walkJson(item, visitor));
+    return;
+  }
+  Object.values(value).forEach((item) => walkJson(item, visitor));
+};
+
+const normalizePrice = (value) => {
+  if (value === null || value === undefined) return 0;
+  const match = String(value).replace(/\s/g, '').match(/(\d+(?:[.,]\d+)?)/);
+  if (!match) return 0;
+  const parsed = Number(match[1].replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const extractJsonLdProducts = (html) => {
+  const products = [];
+  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match = scriptPattern.exec(html);
+
+  while (match) {
+    const json = parseJsonSafely(decodeHtml(match[1]));
+    walkJson(json, (node) => {
+      const rawType = node['@type'];
+      const types = Array.isArray(rawType) ? rawType : [rawType];
+      if (types.some((type) => String(type).toLowerCase() === 'product')) {
+        products.push(node);
+      }
+    });
+    match = scriptPattern.exec(html);
+  }
+
+  return products;
+};
+
+const extractPriceCandidates = (html, jsonProduct) => {
+  const candidates = [];
+  const offer = Array.isArray(jsonProduct?.offers) ? jsonProduct.offers[0] : jsonProduct?.offers;
+  [jsonProduct?.price, offer?.price, offer?.lowPrice, offer?.highPrice].forEach((value) => {
+    const price = normalizePrice(value);
+    if (price > 0) candidates.push(price);
+  });
+
+  const text = decodeHtml(html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' '));
+  const pricePatterns = [
+    /(?:MAD|DH|درهم|د\.م)\s*([0-9]+(?:[.,][0-9]+)?)/gi,
+    /([0-9]+(?:[.,][0-9]+)?)\s*(?:MAD|DH|درهم|د\.م)/gi,
+    /"price"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/gi,
+    /"salePrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/gi,
+    /"originalPrice"\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?/gi,
+  ];
+
+  pricePatterns.forEach((pattern) => {
+    let match = pattern.exec(text);
+    while (match) {
+      const price = normalizePrice(match[1]);
+      if (price > 0 && price < 100000) candidates.push(price);
+      match = pattern.exec(text);
+    }
+  });
+
+  return unique(candidates.map((price) => Number(price.toFixed(2))));
+};
+
+const extractDiscount = (html) => {
+  const text = decodeHtml(html);
+  const match =
+    text.match(/-\s*(\d{1,2})\s*%/) ||
+    text.match(/(\d{1,2})\s*%\s*(?:off|discount|خصم)/i) ||
+    text.match(/خصم\s*(\d{1,2})\s*%/i);
+
+  if (!match) return 0;
+  const discount = Number(match[1]);
+  return Number.isFinite(discount) ? Math.max(0, Math.min(95, discount)) : 0;
+};
+
+const extractImages = (html, jsonProduct) => {
+  const jsonImages = Array.isArray(jsonProduct?.image) ? jsonProduct.image : [jsonProduct?.image];
+  const metaImages = parseMetaValues(html, ['og:image', 'og:image:secure_url', 'twitter:image']);
+  const urlMatches = html.match(/https?:\\?\/\\?\/[^"'<>\\\s]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'<>\\\s]*)?/gi) || [];
+
+  return unique([...jsonImages, ...metaImages, ...urlMatches].map(sanitizeImageUrl)).slice(0, 10);
+};
+
+const guessCategory = (title = '') => {
+  const text = title.toLowerCase();
+  if (/phone|earbud|headphone|watch|charger|led|camera|tablet|laptop|speaker|usb|سماعة|ساعة|هاتف|شاحن|مصباح/.test(text)) {
+    return 'إلكترونيات';
+  }
+  if (/shirt|hoodie|dress|shoe|jacket|pants|ملابس|قميص|حذاء|هودي|جاكيت/.test(text)) {
+    return 'ملابس';
+  }
+  if (/game|toy|controller|kids|لعبة|ألعاب|تحكم/.test(text)) {
+    return 'ألعاب';
+  }
+  if (/bag|case|sunglasses|ring|necklace|watch band|حقيبة|نظارات|خاتم|إكسسوار/.test(text)) {
+    return 'إكسسوارات';
+  }
+  return 'منتجات رقمية';
+};
+
+const stableNumber = (value, min, max) => {
+  const seed = String(value || 'temu')
+    .split('')
+    .reduce((total, letter) => total + letter.charCodeAt(0), 0);
+  return min + (seed % (max - min + 1));
+};
+
+const parseRemoteImages = (value) => {
+  const parsed = typeof value === 'string' ? parseJsonSafely(value) : value;
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .map((image, index) => {
+      const url = sanitizeImageUrl(typeof image === 'string' ? image : image?.url);
+      if (!url) return null;
+      return {
+        url,
+        path: '',
+        name: String(image?.name || `temu-image-${index + 1}`).slice(0, 120),
+        mimeType: String(image?.mimeType || 'external/image'),
+        size: 0,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 10);
+};
+
+const assertTemuUrl = (value) => {
+  try {
+    const parsed = new URL(String(value || '').trim());
+    const host = parsed.hostname.toLowerCase();
+    const allowedHost =
+      host === 'temu.com' ||
+      host.endsWith('.temu.com') ||
+      host === 'temu.to' ||
+      host.endsWith('.temu.to') ||
+      host === 'temuapp.com' ||
+      host.endsWith('.temuapp.com');
+
+    if (!['http:', 'https:'].includes(parsed.protocol) || !allowedHost) {
+      throw new Error(TEMU_IMPORT_ERROR);
+    }
+    return parsed.toString();
+  } catch {
+    throw new Error(TEMU_IMPORT_ERROR);
+  }
+};
+
+const fetchTemuHtml = async (url) => {
+  if (typeof fetch !== 'function') {
+    throw new Error(TEMU_IMPORT_ERROR);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'ar,en-US;q=0.9,en;q=0.8',
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(TEMU_IMPORT_ERROR);
+    }
+
+    return response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const buildImportedProductPreview = (url, html) => {
+  const [jsonProduct = {}] = extractJsonLdProducts(html);
+  const title =
+    stripTemuTitle(jsonProduct.name) ||
+    stripTemuTitle(parseMetaValues(html, ['og:title', 'twitter:title'])[0]) ||
+    stripTemuTitle((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]);
+  const description =
+    decodeHtml(jsonProduct.description) ||
+    decodeHtml(parseMetaValues(html, ['og:description', 'description', 'twitter:description'])[0]) ||
+    title;
+  const images = extractImages(html, jsonProduct).map((imageUrl, index) => ({
+    url: imageUrl,
+    name: `temu-image-${index + 1}`,
+    mimeType: 'external/image',
+  }));
+  const rating = normalizeNumber(jsonProduct.aggregateRating?.ratingValue, null);
+  const prices = extractPriceCandidates(html, jsonProduct).sort((a, b) => a - b);
+  const currentPriceDh = prices[0] || 0;
+  const explicitOriginalDh = prices.length > 1 ? prices[prices.length - 1] : 0;
+  const detectedDiscount = extractDiscount(html);
+  const originalPriceDh =
+    explicitOriginalDh > currentPriceDh
+      ? explicitOriginalDh
+      : Math.ceil(currentPriceDh / (1 - (detectedDiscount || 25) / 100));
+  const finalPrice = Math.max(1, Math.round(currentPriceDh * DH_TO_COINS));
+  const originalPrice = Math.max(finalPrice, Math.round(originalPriceDh * DH_TO_COINS));
+  const discountPercent =
+    detectedDiscount ||
+    (originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0);
+
+  if (!title || !images.length || !finalPrice) {
+    throw new Error(TEMU_IMPORT_ERROR);
+  }
+
+  const stockQuantity = stableNumber(`${title}-${url}`, 6, 24);
+  const promoBadge = discountPercent >= 45 ? 'عرض محدود' : discountPercent >= 30 ? 'خصم قوي' : 'وصل حديثا';
+
+  return {
+    title,
+    description,
+    category: guessCategory(title),
+    originalPrice,
+    discountPercent: Math.max(0, Math.min(95, discountPercent)),
+    finalPrice,
+    stockQuantity,
+    featured: discountPercent >= 30,
+    active: true,
+    rating: rating && rating >= 0 && rating <= 5 ? Number(rating.toFixed(1)) : null,
+    promoBadge,
+    sourceUrl: url,
+    sourceProvider: 'temu',
+    sourcePriceDh: Number(currentPriceDh.toFixed(2)),
+    images,
+  };
+};
+
 const presentProduct = (product) => ({
   id: product._id.toString(),
   _id: product._id,
@@ -104,6 +399,11 @@ const presentProduct = (product) => ({
   discountPercent: product.discountPercent,
   finalPrice: product.finalPrice,
   stockQuantity: product.stockQuantity,
+  rating: product.rating,
+  promoBadge: product.promoBadge,
+  sourceUrl: product.sourceUrl,
+  sourceProvider: product.sourceProvider,
+  sourcePriceDh: product.sourcePriceDh,
   featured: product.featured,
   active: product.active,
   images: product.images || [],
@@ -306,6 +606,23 @@ const adminListProducts = asyncHandler(async (req, res) => {
   });
 });
 
+const adminPreviewProductImport = asyncHandler(async (req, res) => {
+  try {
+    const sourceUrl = assertTemuUrl(req.body.url);
+    const html = await fetchTemuHtml(sourceUrl);
+    const product = buildImportedProductPreview(sourceUrl, html);
+
+    res.json({
+      success: true,
+      message: 'تم جلب معاينة المنتج',
+      product,
+    });
+  } catch (error) {
+    res.status(400);
+    throw new Error(TEMU_IMPORT_ERROR);
+  }
+});
+
 const adminCreateProduct = asyncHandler(async (req, res) => {
   const title = String(req.body.title || '').trim();
   const description = String(req.body.description || '').trim();
@@ -314,6 +631,8 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
   const discountPercent = Math.max(0, Math.min(95, normalizeNumber(req.body.discountPercent)));
   const finalPrice = normalizeNumber(req.body.finalPrice);
   const stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity)));
+  const remoteImages = parseRemoteImages(req.body.remoteImages);
+  const uploadedImages = buildImagesFromFiles(req.files);
 
   if (!title || !originalPrice || !finalPrice) {
     res.status(400);
@@ -328,9 +647,14 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
     discountPercent,
     finalPrice,
     stockQuantity,
+    rating: normalizeNumber(req.body.rating, null),
+    promoBadge: String(req.body.promoBadge || '').trim(),
+    sourceUrl: String(req.body.sourceUrl || '').trim(),
+    sourceProvider: String(req.body.sourceProvider || '').trim(),
+    sourcePriceDh: normalizeNumber(req.body.sourcePriceDh, null),
     featured: req.body.featured === 'true' || req.body.featured === true,
     active: req.body.active !== 'false' && req.body.active !== false,
-    images: buildImagesFromFiles(req.files),
+    images: [...remoteImages, ...uploadedImages].slice(0, 10),
     createdBy: req.user._id,
   });
 
@@ -362,10 +686,15 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   }
   if (req.body.finalPrice !== undefined) product.finalPrice = Math.max(1, normalizeNumber(req.body.finalPrice, product.finalPrice));
   if (req.body.stockQuantity !== undefined) product.stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity, product.stockQuantity)));
+  if (req.body.rating !== undefined) product.rating = normalizeNumber(req.body.rating, null);
+  if (req.body.promoBadge !== undefined) product.promoBadge = String(req.body.promoBadge).trim();
+  if (req.body.sourceUrl !== undefined) product.sourceUrl = String(req.body.sourceUrl).trim();
+  if (req.body.sourceProvider !== undefined) product.sourceProvider = String(req.body.sourceProvider).trim();
+  if (req.body.sourcePriceDh !== undefined) product.sourcePriceDh = normalizeNumber(req.body.sourcePriceDh, null);
   if (req.body.featured !== undefined) product.featured = req.body.featured === 'true' || req.body.featured === true;
   if (req.body.active !== undefined) product.active = req.body.active === 'true' || req.body.active === true;
 
-  const newImages = buildImagesFromFiles(req.files);
+  const newImages = [...parseRemoteImages(req.body.remoteImages), ...buildImagesFromFiles(req.files)];
   if (newImages.length) {
     product.images = [...product.images, ...newImages].slice(0, 10);
   }
@@ -417,6 +746,7 @@ module.exports = {
   adminDeleteProduct,
   adminListOrders,
   adminListProducts,
+  adminPreviewProductImport,
   adminUpdateProduct,
   checkout,
   getProduct,

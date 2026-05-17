@@ -8,6 +8,7 @@ const {
   adminDeleteProduct,
   adminListOrders,
   adminListProducts,
+  adminPreviewProductImport,
   adminUpdateProduct,
 } = require('../controllers/storeController');
 const { adminOnly, protect } = require('../middleware/auth');
@@ -61,6 +62,7 @@ const handleImages = (req, res, next) => {
 
 router.use(protect, adminOnly);
 
+router.post('/products/import-preview', adminPreviewProductImport);
 router.get('/products', adminListProducts);
 router.post('/products', handleImages, adminCreateProduct);
 router.patch('/products/:id', handleImages, adminUpdateProduct);

@@ -96,7 +96,8 @@ const ProductDetails = () => {
         <article className="product-info-panel">
           <div className="product-badges">
             <span>-{product.discountPercent}%</span>
-            {product.featured ? <b>مختار</b> : null}
+            {product.promoBadge || product.featured ? <b>{product.promoBadge || 'مختار'}</b> : null}
+            {product.rating ? <b>تقييم {product.rating}</b> : null}
           </div>
           <h2>{product.title}</h2>
           <p>{product.description || 'تفاصيل المنتج ستظهر هنا عند تحديثه من الإدارة.'}</p>

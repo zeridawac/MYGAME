@@ -6179,6 +6179,120 @@ body:has(.games-page) {
   font-weight: 900;
 }
 
+.store-import-box {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(247, 201, 72, 0.13), transparent 14rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035));
+  border: 1px solid rgba(247, 201, 72, 0.18);
+  border-radius: var(--radius);
+}
+
+.store-import-box strong,
+.store-import-box p {
+  display: block;
+}
+
+.store-import-box p {
+  margin: 0.22rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.store-import-row {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.store-import-row button {
+  width: 100%;
+}
+
+.store-import-preview {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.65rem;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius);
+}
+
+.store-import-preview img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.store-import-preview strong,
+.store-import-preview span,
+.store-import-preview small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-import-preview span {
+  margin-top: 0.2rem;
+  color: var(--gold);
+  font-weight: 900;
+}
+
+.store-import-preview small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+}
+
+.store-import-preview button {
+  grid-column: 1 / -1;
+}
+
+.store-import-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.store-import-gallery figure {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.store-import-gallery img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.store-import-gallery button {
+  position: absolute;
+  top: 0.28rem;
+  left: 0.28rem;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  background: rgba(255, 92, 112, 0.9);
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .admin-store-grid {
   align-items: start;
 }
@@ -6285,6 +6399,27 @@ body:has(.games-page) {
   .store-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.85rem;
+  }
+
+  .store-import-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .store-import-row button {
+    width: auto;
+  }
+
+  .store-import-preview {
+    grid-template-columns: 84px minmax(0, 1fr) auto;
+  }
+
+  .store-import-preview img {
+    width: 84px;
+    height: 84px;
+  }
+
+  .store-import-preview button {
+    grid-column: auto;
   }
 
   .related-products-row {
