@@ -42,73 +42,12 @@ const tabs = [
   { id: 'withdrawals', label: 'السحب', icon: WalletCards },
 ];
 
-const ImportDebugPanel = ({ debug }) => {
-  if (!debug) return null;
-
-  const current = debug.selected?.current;
-  const original = debug.selected?.original;
-  const detectedPrices = debug.detectedPrices || [];
-  const selectors = debug.selectorsTried || [];
-  const imageValidation = debug.imageValidation || [];
-
-  return (
-    <div className={`store-import-debug ${debug.success ? 'success' : 'failed'}`}>
-      <div className="store-import-debug-head">
-        <strong>تشخيص الاستيراد</strong>
-        <span>{debug.success ? 'تم الاستخراج' : 'فشل الاستخراج'}</span>
-      </div>
-      <div className="store-import-debug-grid">
-        <article>
-          <span>السعر المستخرج</span>
-          <strong>{current ? `${current.dhPrice} DH` : 'غير موجود'}</strong>
-          <small>{debug.rawExtractedPrice || current?.rawText || '-'}</small>
-        </article>
-        <article>
-          <span>السعر الأصلي</span>
-          <strong>{original ? `${original.dhPrice} DH` : 'غير موجود'}</strong>
-          <small>{debug.rawExtractedOriginalPrice || original?.rawText || '-'}</small>
-        </article>
-        <article>
-          <span>مصدر التحليل</span>
-          <strong>{debug.parserSourceUsed || current?.source || '-'}</strong>
-          <small>{debug.failureReason || debug.importDiscountRule || 'لا توجد أخطاء'}</small>
-        </article>
-      </div>
-
-      {detectedPrices.length ? (
-        <div className="store-debug-list">
-          <span>الأسعار المكتشفة</span>
-          {detectedPrices.slice(0, 8).map((price, index) => (
-            <code key={`${price.source}-${price.amount}-${index}`}>
-              {price.kind} • {price.amount} {price.currency} • {price.source}
-            </code>
-          ))}
-        </div>
-      ) : null}
-
-      {selectors.length ? (
-        <div className="store-debug-list">
-          <span>المحددات المجربة</span>
-          {selectors.slice(0, 6).map((selector, index) => (
-            <code key={`${selector.selector}-${index}`}>
-              {selector.selector}: {selector.matches || 0} / {selector.candidates || 0}
-            </code>
-          ))}
-        </div>
-      ) : null}
-
-      {imageValidation.length ? (
-        <div className="store-debug-list">
-          <span>فحص الصور</span>
-          {imageValidation.slice(0, 8).map((image, index) => (
-            <code key={`${image.url}-${index}`}>
-              {image.ok ? 'OK' : 'SKIP'} • {image.contentType || image.reason || '-'} • {image.size || 0} bytes
-            </code>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+const calculateOriginalPrice = (finalPrice, discountPercent) => {
+  const finalValue = Number(finalPrice);
+  const discountValue = Math.max(0, Math.min(90, Number(discountPercent) || 0));
+  if (!Number.isFinite(finalValue) || finalValue <= 0) return '';
+  if (!discountValue) return Math.round(finalValue);
+  return Math.round(finalValue / (1 - discountValue / 100));
 };
 
 const AdminDashboard = () => {
@@ -144,7 +83,7 @@ const AdminDashboard = () => {
   const [storeForm, setStoreForm] = useState({
     title: '',
     description: '',
-    category: 'منتجات رقمية',
+    category: 'منتجات',
     originalPrice: '',
     discountPercent: 30,
     finalPrice: '',
@@ -161,12 +100,7 @@ const AdminDashboard = () => {
     featured: false,
     active: true,
   });
-  const [storeImages, setStoreImages] = useState([]);
-  const [temuUrl, setTemuUrl] = useState('');
-  const [temuImporting, setTemuImporting] = useState(false);
-  const [importPreview, setImportPreview] = useState(null);
-  const [importDebug, setImportDebug] = useState(null);
-  const [importedImages, setImportedImages] = useState([]);
+  const [imageUrlFields, setImageUrlFields] = useState(['']);
   const [storeEdits, setStoreEdits] = useState({});
   const [storeEditImages, setStoreEditImages] = useState({});
   const [assetForm, setAssetForm] = useState({
@@ -189,6 +123,10 @@ const AdminDashboard = () => {
       store: storeProducts.filter((item) => item.active).length,
     }),
     [users, inviteCodes, withdrawals, assets, coupons, storeProducts]
+  );
+  const calculatedOriginalPrice = useMemo(
+    () => calculateOriginalPrice(storeForm.finalPrice, storeForm.discountPercent),
+    [storeForm.finalPrice, storeForm.discountPercent]
   );
 
   const loadAdminData = async () => {
@@ -357,82 +295,39 @@ const AdminDashboard = () => {
     });
   };
 
-  const clearImportedProduct = () => {
-    setTemuUrl('');
-    setImportPreview(null);
-    setImportDebug(null);
-    setImportedImages([]);
-    setStoreForm((current) => ({
-      ...current,
-      sourceUrl: '',
-      sourceProvider: '',
-      sourceCurrency: '',
-      sourcePriceAmount: '',
-      sourcePriceDh: '',
-      sourceOriginalPriceAmount: '',
-      sourceOriginalPriceDh: '',
-    }));
+  const updateImageUrlField = (index, value) => {
+    setImageUrlFields((current) => current.map((item, itemIndex) => (itemIndex === index ? value : item)));
   };
 
-  const previewTemuProduct = async () => {
-    if (!temuUrl.trim()) {
-      showToast('ضع رابط المنتج أولا', 'error');
-      return;
-    }
-
-    setTemuImporting(true);
-    try {
-      const { data } = await api.post('/admin/store/products/import-preview', { url: temuUrl.trim() });
-      const product = data.product;
-      setImportPreview(product);
-      setImportDebug(data.debug || product.importDebug || null);
-      setImportedImages(product.images || []);
-      setStoreForm((current) => ({
-        ...current,
-        title: product.title || current.title,
-        description: product.description || current.description,
-        category: product.category || current.category,
-        originalPrice: product.originalPrice || current.originalPrice,
-        discountPercent: product.discountPercent ?? current.discountPercent,
-        finalPrice: product.finalPrice || current.finalPrice,
-        stockQuantity: product.stockQuantity ?? current.stockQuantity,
-        rating: product.rating ?? '',
-        promoBadge: product.promoBadge || '',
-        sourceUrl: product.sourceUrl || temuUrl.trim(),
-        sourceProvider: product.sourceProvider || 'temu',
-        sourceCurrency: product.sourceCurrency || '',
-        sourcePriceAmount: product.sourcePriceAmount ?? '',
-        sourcePriceDh: product.sourcePriceDh ?? '',
-        sourceOriginalPriceAmount: product.sourceOriginalPriceAmount ?? '',
-        sourceOriginalPriceDh: product.sourceOriginalPriceDh ?? '',
-        featured: Boolean(product.featured),
-        active: true,
-      }));
-      showToast(data.message || 'تم جلب معاينة المنتج', 'success');
-    } catch (error) {
-      setImportPreview(null);
-      setImportedImages([]);
-      setImportDebug(error.response?.data?.debug || { success: false, failureReason: error.message });
-      showToast(error.message || 'تعذر جلب بيانات المنتج', 'error');
-    } finally {
-      setTemuImporting(false);
-    }
+  const addImageUrlField = () => {
+    setImageUrlFields((current) => [...current, '']);
   };
 
-  const removeImportedImage = (index) => {
-    setImportedImages((current) => current.filter((_, imageIndex) => imageIndex !== index));
+  const removeImageUrlField = (index) => {
+    setImageUrlFields((current) => {
+      const next = current.filter((_, itemIndex) => itemIndex !== index);
+      return next.length ? next : [''];
+    });
   };
 
   const createStoreProduct = async (event) => {
     event.preventDefault();
     try {
       const formData = new FormData();
-      appendStoreFields(formData, storeForm);
-      if (importedImages.length) {
-        formData.append('remoteImages', JSON.stringify(importedImages));
+      const imageUrls = imageUrlFields.map((url) => url.trim()).filter(Boolean);
+      const productPayload = {
+        ...storeForm,
+        originalPrice: calculatedOriginalPrice || storeForm.finalPrice,
+        promoBadge: storeForm.promoBadge || `خصم ${storeForm.discountPercent || 0}%`,
+        sourceProvider: 'manual',
+      };
+      appendStoreFields(formData, productPayload);
+      if (imageUrls.length) {
+        formData.append(
+          'remoteImages',
+          JSON.stringify(imageUrls.map((url, index) => ({ url, name: `product-image-${index + 1}` })))
+        );
       }
-      Array.from(storeImages).forEach((file) => formData.append('images', file));
-
       const { data } = await api.post('/admin/store/products', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -440,7 +335,7 @@ const AdminDashboard = () => {
       setStoreForm({
         title: '',
         description: '',
-        category: 'منتجات رقمية',
+        category: 'منتجات',
         originalPrice: '',
         discountPercent: 30,
         finalPrice: '',
@@ -457,8 +352,7 @@ const AdminDashboard = () => {
         featured: false,
         active: true,
       });
-      setStoreImages([]);
-      clearImportedProduct();
+      setImageUrlFields(['']);
       event.target.reset();
       showToast(data.message, 'success');
     } catch (error) {
@@ -879,99 +773,51 @@ const AdminDashboard = () => {
           <div className="admin-section-grid admin-store-grid">
             <form className="stack-form admin-form" onSubmit={createStoreProduct}>
               <h3>منتج جديد</h3>
-              <div className="store-import-box">
-                <div>
-                  <span className="eyebrow">Temu Import</span>
-                  <strong>استيراد تلقائي من رابط Temu</strong>
-                  <p>الصق رابط المنتج، راجع المعاينة، ثم عدل البيانات قبل النشر.</p>
-                </div>
-                <div className="store-import-row">
-                  <input
-                    value={temuUrl}
-                    onChange={(event) => setTemuUrl(event.target.value)}
-                    placeholder="https://www.temu.com/..."
-                    type="url"
-                  />
-                  <button className="ghost-button" type="button" onClick={previewTemuProduct} disabled={temuImporting}>
-                    {temuImporting ? 'جاري الجلب...' : 'جلب المنتج'}
-                  </button>
-                </div>
-
-                {importPreview ? (
-                  <div className="store-import-preview">
-                    <img
-                      src={productImageUrl({ title: storeForm.title, category: storeForm.category, images: importedImages })}
-                      alt={storeForm.title}
-                    />
-                    <div>
-                      <strong>{storeForm.title}</strong>
-                      <span>
-                        {storeForm.sourcePriceAmount
-                          ? `${storeForm.sourcePriceAmount} ${storeForm.sourceCurrency || 'DH'} → `
-                          : ''}
-                        {formatCoins(storeForm.finalPrice || 0)} كوين
-                      </span>
-                      <small>
-                        {storeForm.sourcePriceDh ? `${storeForm.sourcePriceDh} DH محولة • ` : ''}
-                        {storeForm.promoBadge || 'وصل حديثا'} • مخزون {storeForm.stockQuantity}
-                      </small>
-                    </div>
-                    <button className="ghost-button table-button" type="button" onClick={clearImportedProduct}>
-                      مسح المعاينة
-                    </button>
-                  </div>
-                ) : null}
-
-                {importPreview ? (
-                  <div className="store-import-price-grid">
-                    <article>
-                      <span>السعر المستخرج</span>
-                      <strong>
-                        {storeForm.sourcePriceAmount || storeForm.sourcePriceDh} {storeForm.sourceCurrency || 'DH'}
-                      </strong>
-                    </article>
-                    <article>
-                      <span>بعد التحويل</span>
-                      <strong>{storeForm.sourcePriceDh || 0} DH</strong>
-                    </article>
-                    <article>
-                      <span>الأصلي</span>
-                      <strong>{formatCoins(storeForm.originalPrice || 0)} كوين</strong>
-                    </article>
-                    <article>
-                      <span>النهائي</span>
-                      <strong>{formatCoins(storeForm.finalPrice || 0)} كوين</strong>
-                    </article>
-                    <article>
-                      <span>الخصم</span>
-                      <strong>{storeForm.discountPercent || 0}%</strong>
-                    </article>
-                  </div>
-                ) : null}
-
-                <ImportDebugPanel debug={importDebug} />
-
-                {importedImages.length ? (
-                  <div className="store-import-gallery">
-                    {importedImages.map((image, index) => (
-                      <figure key={`${image.url}-${index}`}>
-                        <img src={productImageUrl({ images: [image], title: storeForm.title })} alt={`صورة ${index + 1}`} />
-                        <button type="button" onClick={() => removeImportedImage(index)}>
-                          ×
-                        </button>
-                      </figure>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
               <label>
-                <span>عنوان المنتج</span>
+                <span>اسم المنتج</span>
                 <input
                   value={storeForm.title}
                   onChange={(event) => setStoreForm({ ...storeForm, title: event.target.value })}
                   required
                 />
               </label>
+              <div className="manual-image-url-box">
+                <div>
+                  <span className="eyebrow">صور المنتج</span>
+                  <strong>روابط الصور المباشرة</strong>
+                  <p>الصق روابط صور مباشرة. يمكن إضافة أكثر من صورة، وستظهر المعاينة فوراً.</p>
+                </div>
+                {imageUrlFields.map((url, index) => (
+                  <div className="manual-image-url-row" key={`image-url-${index}`}>
+                    <input
+                      value={url}
+                      onChange={(event) => updateImageUrlField(index, event.target.value)}
+                      placeholder="https://img.kwcdn.com/product/..."
+                      type="url"
+                    />
+                    <button className="ghost-button table-button" type="button" onClick={() => removeImageUrlField(index)}>
+                      حذف
+                    </button>
+                  </div>
+                ))}
+                <button className="ghost-button" type="button" onClick={addImageUrlField}>
+                  إضافة رابط صورة
+                </button>
+                <div className="manual-image-preview-grid">
+                  {imageUrlFields
+                    .map((url, index) => ({ url: url.trim(), index }))
+                    .filter((item) => item.url)
+                    .map((item, previewIndex) => (
+                      <figure key={`${item.url}-${item.index}`}>
+                        <img
+                          src={item.url}
+                          alt={`صورة المنتج ${previewIndex + 1}`}
+                          onError={() => updateImageUrlField(item.index, '')}
+                        />
+                      </figure>
+                    ))}
+                </div>
+              </div>
               <label>
                 <span>الوصف</span>
                 <textarea
@@ -982,35 +828,7 @@ const AdminDashboard = () => {
               </label>
               <div className="form-two">
                 <label>
-                  <span>التصنيف</span>
-                  <input
-                    value={storeForm.category}
-                    onChange={(event) => setStoreForm({ ...storeForm, category: event.target.value })}
-                  />
-                </label>
-                <label>
-                  <span>المخزون</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={storeForm.stockQuantity}
-                    onChange={(event) => setStoreForm({ ...storeForm, stockQuantity: event.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="form-two">
-                <label>
-                  <span>السعر الأصلي</span>
-                  <input
-                    type="number"
-                    min="1"
-                    value={storeForm.originalPrice}
-                    onChange={(event) => setStoreForm({ ...storeForm, originalPrice: event.target.value })}
-                    required
-                  />
-                </label>
-                <label>
-                  <span>السعر النهائي</span>
+                  <span>السعر بالكوين</span>
                   <input
                     type="number"
                     min="1"
@@ -1019,59 +837,32 @@ const AdminDashboard = () => {
                     required
                   />
                 </label>
-              </div>
-              <label>
-                <span>نسبة الخصم %</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="95"
-                  value={storeForm.discountPercent}
-                  onChange={(event) => setStoreForm({ ...storeForm, discountPercent: event.target.value })}
-                />
-              </label>
-              <div className="form-two">
                 <label>
-                  <span>شارة العرض</span>
-                  <input
-                    value={storeForm.promoBadge}
-                    onChange={(event) => setStoreForm({ ...storeForm, promoBadge: event.target.value })}
-                    placeholder="عرض محدود"
-                  />
-                </label>
-                <label>
-                  <span>التقييم</span>
+                  <span>نسبة الخصم</span>
                   <input
                     type="number"
                     min="0"
-                    max="5"
-                    step="0.1"
-                    value={storeForm.rating}
-                    onChange={(event) => setStoreForm({ ...storeForm, rating: event.target.value })}
-                    placeholder="4.8"
+                    max="90"
+                    value={storeForm.discountPercent}
+                    onChange={(event) => setStoreForm({ ...storeForm, discountPercent: event.target.value })}
                   />
                 </label>
               </div>
-              <label>
-                <span>صور المنتج</span>
-                <input type="file" accept="image/*" multiple onChange={(event) => setStoreImages(event.target.files)} />
-              </label>
+              {calculatedOriginalPrice ? (
+                <div className="manual-price-preview">
+                  <span>السعر الأصلي المحسوب</span>
+                  <strong>{formatCoins(calculatedOriginalPrice)} كوين</strong>
+                </div>
+              ) : null}
               <div className="form-two">
-                <label className="switch-line">
+                <label>
+                  <span>المخزون</span>
                   <input
-                    type="checkbox"
-                    checked={storeForm.featured}
-                    onChange={(event) => setStoreForm({ ...storeForm, featured: event.target.checked })}
+                    type="number"
+                    min="0"
+                    value={storeForm.stockQuantity}
+                    onChange={(event) => setStoreForm({ ...storeForm, stockQuantity: event.target.value })}
                   />
-                  <span>منتج مميز</span>
-                </label>
-                <label className="switch-line">
-                  <input
-                    type="checkbox"
-                    checked={storeForm.active}
-                    onChange={(event) => setStoreForm({ ...storeForm, active: event.target.checked })}
-                  />
-                  <span>مفعل</span>
                 </label>
               </div>
               <button className="primary-button" type="submit">

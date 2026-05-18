@@ -8,22 +8,12 @@ import { useToast } from '../context/ToastContext.jsx';
 import { formatCoins } from '../utils/coins.js';
 import { productImageUrl, resolveStoreAssetUrl } from '../utils/storeImages.js';
 
-const cleanTemuImageUrl = (url = '') => {
-  try {
-    const parsed = new URL(url);
-    ['imageMogr2', 'thumbnail', 'resize', 'x-oss-process'].forEach((key) => parsed.searchParams.delete(key));
-    return parsed.toString();
-  } catch {
-    return url;
-  }
-};
-
 const productImageCandidates = (product) => {
   const urls = (product?.images || [])
     .map((image) => image?.url)
     .concat(product?.imageUrl || [], product?.url || [])
     .filter(Boolean)
-    .map((url) => cleanTemuImageUrl(resolveStoreAssetUrl(url)));
+    .map((url) => resolveStoreAssetUrl(url));
 
   return [...new Set(urls)];
 };

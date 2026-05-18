@@ -6874,6 +6874,80 @@ body:has(.games-page) {
   border-radius: var(--radius);
 }
 
+.manual-image-url-box {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(62, 226, 197, 0.12), transparent 14rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035));
+  border: 1px solid rgba(62, 226, 197, 0.18);
+  border-radius: var(--radius);
+}
+
+.manual-image-url-box strong,
+.manual-image-url-box p {
+  display: block;
+}
+
+.manual-image-url-box p {
+  margin: 0.22rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.manual-image-url-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.manual-image-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.manual-image-preview-grid figure {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.manual-image-preview-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.manual-price-preview {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.72rem 0.78rem;
+  background: rgba(247, 201, 72, 0.095);
+  border: 1px solid rgba(247, 201, 72, 0.2);
+  border-radius: 10px;
+}
+
+.manual-price-preview span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.manual-price-preview strong {
+  color: var(--gold);
+  font-weight: 900;
+}
+
 .store-import-box strong,
 .store-import-box p {
   display: block;
@@ -7541,6 +7615,18 @@ body:has(.games-page) {
   .store-cart-list img {
     width: 62px;
     height: 62px;
+  }
+
+  .manual-image-url-row {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-image-url-row button {
+    width: 100%;
+  }
+
+  .manual-image-preview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .cart-hero {

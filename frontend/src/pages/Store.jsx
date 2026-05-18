@@ -10,32 +10,36 @@ import { useToast } from '../context/ToastContext.jsx';
 import { formatCoinDh, formatCoins } from '../utils/coins.js';
 import { productImageUrl } from '../utils/storeImages.js';
 
-const StoreProductCard = ({ product, onAdd }) => (
-  <article className="store-product-card">
-    <Link className="store-product-image" to={`/store/${product.id}`}>
-      <img src={productImageUrl(product)} alt={product.title} />
-      {product.discountPercent > 0 ? <span className="store-discount-badge">-{product.discountPercent}%</span> : null}
-      {product.promoBadge || product.featured ? (
-        <b className="store-hot-badge">{product.promoBadge || 'عرض قوي'}</b>
-      ) : null}
-    </Link>
-    <div className="store-product-body">
-      <Link to={`/store/${product.id}`}>
-        <h3>{product.title}</h3>
+const StoreProductCard = ({ product, onAdd }) => {
+  const imageUrl = product.images?.[0]?.url ? productImageUrl(product) : '';
+
+  return (
+    <article className="store-product-card">
+      <Link className="store-product-image" to={`/store/${product.id}`}>
+        {imageUrl ? <img src={imageUrl} alt={product.title} onError={(event) => event.currentTarget.remove()} /> : null}
+        {product.discountPercent > 0 ? <span className="store-discount-badge">-{product.discountPercent}%</span> : null}
+        {product.promoBadge || product.featured ? (
+          <b className="store-hot-badge">{product.promoBadge || 'عرض قوي'}</b>
+        ) : null}
       </Link>
-      <div className="store-price-row">
-        {product.originalPrice > product.finalPrice ? <del>{formatCoins(product.originalPrice)} كوين</del> : null}
-        <strong>{formatCoins(product.finalPrice)} كوين</strong>
+      <div className="store-product-body">
+        <Link to={`/store/${product.id}`}>
+          <h3>{product.title}</h3>
+        </Link>
+        <div className="store-price-row">
+          {product.originalPrice > product.finalPrice ? <del>{formatCoins(product.originalPrice)} كوين</del> : null}
+          <strong>{formatCoins(product.finalPrice)} كوين</strong>
+        </div>
+        <div className="store-card-bottom">
+          <span>{product.stockQuantity > 0 ? `باقي ${product.stockQuantity}` : 'نفد المخزون'}</span>
+          <button type="button" onClick={() => onAdd(product)} disabled={product.stockQuantity <= 0}>
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
-      <div className="store-card-bottom">
-        <span>{product.stockQuantity > 0 ? `باقي ${product.stockQuantity}` : 'نفد المخزون'}</span>
-        <button type="button" onClick={() => onAdd(product)} disabled={product.stockQuantity <= 0}>
-          <Plus size={16} />
-        </button>
-      </div>
-    </div>
-  </article>
-);
+    </article>
+  );
+};
 
 const StoreShelf = ({ title, eyebrow, products, onAdd }) => {
   if (!products.length) return null;
