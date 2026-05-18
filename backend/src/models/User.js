@@ -98,6 +98,7 @@ const userSchema = new mongoose.Schema(
       country: { type: String, trim: true, default: '' },
       city: { type: String, trim: true, default: '' },
       timezone: { type: String, trim: true, default: '' },
+      timestamp: { type: Date, default: null },
       updatedAt: { type: Date, default: null },
     },
     bankDetails: {

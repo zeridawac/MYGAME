@@ -76,9 +76,21 @@ const mapUrlForLocation = (location) => {
   const latitude = Number(location?.latitude);
   const longitude = Number(location?.longitude);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
-  const delta = 0.01;
-  const bbox = [longitude - delta, latitude - delta, longitude + delta, latitude + delta].join(',');
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitude},${longitude}`;
+  return `https://maps.google.com/maps?q=${latitude},${longitude}&z=16&hl=ar&output=embed`;
+};
+
+const googleMapsUrlForLocation = (location) => {
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+  return `https://maps.google.com/?q=${latitude},${longitude}`;
+};
+
+const coordinateLabel = (location) => {
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 };
 
 const AdminDashboard = () => {
@@ -102,6 +114,7 @@ const AdminDashboard = () => {
   });
   const [activity, setActivity] = useState([]);
   const [userActivity, setUserActivity] = useState([]);
+  const [activeMapUser, setActiveMapUser] = useState(null);
   const [inviteForm, setInviteForm] = useState({ code: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
   const [couponForm, setCouponForm] = useState({
@@ -1207,13 +1220,23 @@ const AdminDashboard = () => {
                       <MapPin size={16} />
                       <span>{locationLabel(location)}</span>
                     </div>
+                    {coordinateLabel(location) ? (
+                      <small className="user-coordinate-line">
+                        {coordinateLabel(location)}
+                        {location.accuracy ? ` • دقة ${Math.round(location.accuracy)}م` : ''}
+                      </small>
+                    ) : null}
                     {mapUrl ? (
-                      <iframe
-                        className="user-location-map"
-                        title={`خريطة ${item.username}`}
-                        src={mapUrl}
-                        loading="lazy"
-                      />
+                      <div className="user-location-map-button" role="button" tabIndex={0} onClick={() => setActiveMapUser(item)}>
+                        <iframe
+                          className="user-location-map"
+                          title={`خريطة ${item.username}`}
+                          src={mapUrl}
+                          loading="lazy"
+                          allowFullScreen
+                        />
+                        <span>اضغط لفتح الخريطة التفاعلية</span>
+                      </div>
                     ) : (
                       <div className="user-location-map is-empty">لا توجد إحداثيات محفوظة</div>
                     )}
@@ -1293,6 +1316,44 @@ const AdminDashboard = () => {
           )
         ) : null}
       </section>
+
+      {activeMapUser ? (
+        <div className="admin-map-modal" role="dialog" aria-modal="true" aria-label="خريطة موقع المستخدم" onClick={() => setActiveMapUser(null)}>
+          <div className="admin-map-panel" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <span className="eyebrow">خريطة المستخدم</span>
+                <h3>{activeMapUser.username}</h3>
+                <p>{locationLabel(activeMapUser.lastKnownLocation)}</p>
+                <small>
+                  {coordinateLabel(activeMapUser.lastKnownLocation)}
+                  {activeMapUser.lastKnownLocation?.accuracy ? ` • دقة ${Math.round(activeMapUser.lastKnownLocation.accuracy)}م` : ''}
+                  {' • '}
+                  آخر نشاط: {formatActivityDateTime(activeMapUser.lastActiveAt)}
+                </small>
+              </div>
+              <button className="ghost-button table-button" type="button" onClick={() => setActiveMapUser(null)}>
+                إغلاق
+              </button>
+            </header>
+            <iframe
+              className="admin-map-frame"
+              title={`خريطة ${activeMapUser.username}`}
+              src={mapUrlForLocation(activeMapUser.lastKnownLocation)}
+              loading="lazy"
+              allowFullScreen
+            />
+            <a
+              className="primary-button admin-map-google-link"
+              href={googleMapsUrlForLocation(activeMapUser.lastKnownLocation)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              فتح في خرائط جوجل
+            </a>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

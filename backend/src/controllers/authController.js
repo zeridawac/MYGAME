@@ -103,8 +103,22 @@ const me = asyncHandler(async (req, res) => {
   });
 });
 
+const updateLocation = asyncHandler(async (req, res) => {
+  req.user.lastKnownLocation = normalizeLocationPayload(req.body.location);
+  req.user.lastActiveAt = new Date();
+  req.user.ipAddress = getRequestIp(req);
+  await req.user.save();
+
+  res.json({
+    success: true,
+    message: 'تم تحديث الموقع',
+    user: presentUser(req.user),
+  });
+});
+
 module.exports = {
   register,
   login,
   me,
+  updateLocation,
 };

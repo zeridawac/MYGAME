@@ -26,6 +26,9 @@ const normalizeLocationPayload = (payload = {}) => {
   const latitude = Number(payload.latitude);
   const longitude = Number(payload.longitude);
   const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const timestamp = payload.timestamp || payload.capturedAt || payload.updatedAt;
+  const parsedTimestamp = timestamp ? new Date(timestamp) : null;
+  const safeTimestamp = parsedTimestamp && !Number.isNaN(parsedTimestamp.getTime()) ? parsedTimestamp : new Date();
 
   return {
     latitude: hasCoordinates ? latitude : null,
@@ -36,6 +39,7 @@ const normalizeLocationPayload = (payload = {}) => {
     country: String(payload.country || guessed.country || '').trim(),
     city: String(payload.city || guessed.city || '').trim(),
     timezone,
+    timestamp: safeTimestamp,
     updatedAt: new Date(),
   };
 };
