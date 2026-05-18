@@ -49,6 +49,7 @@ const ImportDebugPanel = ({ debug }) => {
   const original = debug.selected?.original;
   const detectedPrices = debug.detectedPrices || [];
   const selectors = debug.selectorsTried || [];
+  const imageValidation = debug.imageValidation || [];
 
   return (
     <div className={`store-import-debug ${debug.success ? 'success' : 'failed'}`}>
@@ -70,7 +71,7 @@ const ImportDebugPanel = ({ debug }) => {
         <article>
           <span>مصدر التحليل</span>
           <strong>{debug.parserSourceUsed || current?.source || '-'}</strong>
-          <small>{debug.failureReason || 'لا توجد أخطاء'}</small>
+          <small>{debug.failureReason || debug.importDiscountRule || 'لا توجد أخطاء'}</small>
         </article>
       </div>
 
@@ -91,6 +92,17 @@ const ImportDebugPanel = ({ debug }) => {
           {selectors.slice(0, 6).map((selector, index) => (
             <code key={`${selector.selector}-${index}`}>
               {selector.selector}: {selector.matches || 0} / {selector.candidates || 0}
+            </code>
+          ))}
+        </div>
+      ) : null}
+
+      {imageValidation.length ? (
+        <div className="store-debug-list">
+          <span>فحص الصور</span>
+          {imageValidation.slice(0, 8).map((image, index) => (
+            <code key={`${image.url}-${index}`}>
+              {image.ok ? 'OK' : 'SKIP'} • {image.contentType || image.reason || '-'} • {image.size || 0} bytes
             </code>
           ))}
         </div>

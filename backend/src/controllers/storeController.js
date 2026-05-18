@@ -1,4 +1,5 @@
 const fs = require('fs/promises');
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const path = require('path');
 const asyncHandler = require('../utils/asyncHandler');
@@ -12,6 +13,11 @@ const TEMU_IMPORT_ERROR = 'تعذر جلب بيانات المنتج';
 const TEMU_PRICE_ERROR = 'تعذر استخراج سعر المنتج';
 const DH_TO_COINS = 10;
 const MIN_PRODUCT_PRICE_DH = 5;
+const DEFAULT_IMPORT_DISCOUNT = 30;
+const MAX_RELIABLE_IMPORT_DISCOUNT = 50;
+const MIN_PRODUCT_IMAGE_BYTES = 6 * 1024;
+const MAX_PRODUCT_IMAGE_BYTES = 12 * 1024 * 1024;
+const MIN_PRODUCT_IMAGE_DIMENSION = 180;
 
 const starterProducts = [
   {
@@ -212,10 +218,13 @@ const compactImportDebug = (debug = {}) => ({
   parserSourceUsed: debug.parserSourceUsed || '',
   rawExtractedPrice: debug.rawExtractedPrice || null,
   rawExtractedOriginalPrice: debug.rawExtractedOriginalPrice || null,
+  importDiscountRule: debug.importDiscountRule || '',
   selectorsTried: (debug.selectorsTried || []).slice(0, 20),
   parserSources: (debug.parserSources || []).slice(0, 20),
   detectedPrices: (debug.detectedPrices || []).slice(0, 60),
+  imageValidation: (debug.imageValidation || []).slice(0, 20),
   selected: debug.selected || null,
+  rawImagesFound: debug.rawImagesFound || 0,
   imagesFound: debug.imagesFound || 0,
 });
 
@@ -226,10 +235,13 @@ const createImportDebug = (url) => ({
   parserSourceUsed: '',
   rawExtractedPrice: null,
   rawExtractedOriginalPrice: null,
+  importDiscountRule: '',
   selectorsTried: [],
   parserSources: [],
   detectedPrices: [],
+  imageValidation: [],
   selected: null,
+  rawImagesFound: 0,
   imagesFound: 0,
 });
 
@@ -696,6 +708,26 @@ const upgradeImageUrl = (url = '') => {
   }
 };
 
+const isLikelyPlaceholderImageUrl = (url = '') => {
+  const lowered = String(url).toLowerCase();
+  return (
+    !lowered ||
+    lowered.startsWith('data:') ||
+    lowered.includes('.svg') ||
+    lowered.includes('/svg') ||
+    lowered.includes('sprite') ||
+    lowered.includes('icon') ||
+    lowered.includes('logo') ||
+    lowered.includes('avatar') ||
+    lowered.includes('placeholder') ||
+    lowered.includes('default-image') ||
+    lowered.includes('loading') ||
+    lowered.includes('blank') ||
+    lowered.includes('transparent') ||
+    lowered.includes('1x1')
+  );
+};
+
 const extractImages = (html, jsonProduct, scriptSources = [], debug) => {
   const jsonImages = Array.isArray(jsonProduct?.image) ? jsonProduct.image : [jsonProduct?.image];
   const metaImages = parseMetaValues(html, ['og:image', 'og:image:secure_url', 'twitter:image']);
@@ -741,7 +773,7 @@ const extractImages = (html, jsonProduct, scriptSources = [], debug) => {
       return upgradeImageUrl(sanitizeImageUrl(normalized));
     })
     .filter((url) => {
-      if (!url) return false;
+      if (!url || isLikelyPlaceholderImageUrl(url)) return false;
       const lowered = url.toLowerCase();
       return (
         /\.(jpg|jpeg|png|webp)(?:$|\?)/i.test(lowered) ||
@@ -767,8 +799,171 @@ const extractImages = (html, jsonProduct, scriptSources = [], debug) => {
   });
 
   const images = [...byBaseUrl.values()].slice(0, 16);
-  if (debug) debug.imagesFound = images.length;
+  if (debug) debug.rawImagesFound = images.length;
   return images;
+};
+
+const imageExtensionFromContentType = (contentType = '') => {
+  const normalized = contentType.toLowerCase();
+  if (normalized.includes('jpeg') || normalized.includes('jpg')) return 'jpg';
+  if (normalized.includes('png')) return 'png';
+  if (normalized.includes('webp')) return 'webp';
+  return 'jpg';
+};
+
+const readUInt24LE = (buffer, offset) => buffer[offset] + (buffer[offset + 1] << 8) + (buffer[offset + 2] << 16);
+
+const getImageDimensions = (buffer, contentType = '') => {
+  if (!buffer || buffer.length < 24) return null;
+  const type = contentType.toLowerCase();
+
+  if (type.includes('png') && buffer.toString('ascii', 1, 4) === 'PNG') {
+    return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+  }
+
+  if (type.includes('webp') && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    const chunk = buffer.toString('ascii', 12, 16);
+    if (chunk === 'VP8X' && buffer.length >= 30) {
+      return { width: readUInt24LE(buffer, 24) + 1, height: readUInt24LE(buffer, 27) + 1 };
+    }
+    if (chunk === 'VP8 ' && buffer.length >= 30) {
+      return { width: buffer.readUInt16LE(26) & 0x3fff, height: buffer.readUInt16LE(28) & 0x3fff };
+    }
+    if (chunk === 'VP8L' && buffer.length >= 25) {
+      const bits = buffer.readUInt32LE(21);
+      return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+    }
+  }
+
+  if ((type.includes('jpeg') || type.includes('jpg')) && buffer[0] === 0xff && buffer[1] === 0xd8) {
+    let offset = 2;
+    while (offset < buffer.length) {
+      if (buffer[offset] !== 0xff) break;
+      const marker = buffer[offset + 1];
+      const length = buffer.readUInt16BE(offset + 2);
+      if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+        return { width: buffer.readUInt16BE(offset + 7), height: buffer.readUInt16BE(offset + 5) };
+      }
+      offset += 2 + length;
+    }
+  }
+
+  return null;
+};
+
+const fetchImageBuffer = async (url, referer = '') => {
+  if (typeof fetch !== 'function') return { ok: false, reason: 'fetch is not available' };
+  if (isLikelyPlaceholderImageUrl(url)) return { ok: false, reason: 'placeholder/icon url' };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        accept: 'image/avif,image/webp,image/apng,image/png,image/jpeg,image/*,*/*;q=0.8',
+        'accept-language': 'ar,en-US;q=0.9,en;q=0.8',
+        referer: referer || 'https://www.temu.com/',
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      },
+    });
+
+    if (response.status !== 200) return { ok: false, reason: `HTTP ${response.status}` };
+
+    const contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!contentType.startsWith('image/') || contentType.includes('svg')) {
+      return { ok: false, reason: `invalid content-type ${contentType || 'unknown'}` };
+    }
+
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength && contentLength < MIN_PRODUCT_IMAGE_BYTES) return { ok: false, reason: `too small ${contentLength} bytes` };
+    if (contentLength && contentLength > MAX_PRODUCT_IMAGE_BYTES) return { ok: false, reason: `too large ${contentLength} bytes` };
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (buffer.length < MIN_PRODUCT_IMAGE_BYTES) return { ok: false, reason: `too small ${buffer.length} bytes` };
+    if (buffer.length > MAX_PRODUCT_IMAGE_BYTES) return { ok: false, reason: `too large ${buffer.length} bytes` };
+
+    const dimensions = getImageDimensions(buffer, contentType);
+    if (dimensions && (dimensions.width < MIN_PRODUCT_IMAGE_DIMENSION || dimensions.height < MIN_PRODUCT_IMAGE_DIMENSION)) {
+      return { ok: false, reason: `tiny image ${dimensions.width}x${dimensions.height}` };
+    }
+
+    return {
+      ok: true,
+      buffer,
+      contentType,
+      extension: imageExtensionFromContentType(contentType),
+      size: buffer.length,
+      width: dimensions?.width || null,
+      height: dimensions?.height || null,
+    };
+  } catch (error) {
+    return { ok: false, reason: error.name === 'AbortError' ? 'image fetch timeout' : error.message };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const publicStoreImagePath = (filename) => `${STORE_UPLOAD_BASE}/${filename}`;
+
+const localStorePathFromPublicUrl = (url = '') => {
+  const normalized = String(url || '').trim();
+  if (!normalized.startsWith(STORE_UPLOAD_BASE)) return '';
+  const filename = path.basename(normalized.split('?')[0]);
+  return path.join(STORE_UPLOAD_ROOT, filename);
+};
+
+const storeImageBuffer = async (url, imageData, index = 0) => {
+  await fs.mkdir(STORE_UPLOAD_ROOT, { recursive: true });
+  const filename = `temu-${Date.now()}-${index}-${crypto.randomUUID()}.${imageData.extension}`;
+  const filePath = path.join(STORE_UPLOAD_ROOT, filename);
+  await fs.writeFile(filePath, imageData.buffer);
+
+  return {
+    url: publicStoreImagePath(filename),
+    path: filePath,
+    name: filename,
+    mimeType: imageData.contentType,
+    size: imageData.size,
+  };
+};
+
+const validateAndStoreRemoteImages = async (urls = [], referer = '', debug) => {
+  const candidates = unique(urls.map((url) => upgradeImageUrl(sanitizeImageUrl(url))).filter((url) => url && !isLikelyPlaceholderImageUrl(url))).slice(0, 24);
+  const results = [];
+  const validationLog = [];
+
+  for (const url of candidates) {
+    if (results.length >= 10) break;
+    const imageData = await fetchImageBuffer(url, referer);
+    validationLog.push({
+      url: url.slice(0, 180),
+      ok: imageData.ok,
+      reason: imageData.reason || '',
+      contentType: imageData.contentType || '',
+      size: imageData.size || 0,
+      width: imageData.width || null,
+      height: imageData.height || null,
+    });
+    if (!imageData.ok) continue;
+
+    try {
+      results.push(await storeImageBuffer(url, imageData, results.length + 1));
+    } catch (error) {
+      validationLog.at(-1).ok = false;
+      validationLog.at(-1).reason = error.message;
+    }
+  }
+
+  if (debug) {
+    debug.imageValidation = validationLog.slice(0, 20);
+    debug.imagesFound = results.length;
+  }
+
+  return results;
 };
 
 const guessCategory = (title = '') => {
@@ -801,18 +996,39 @@ const parseRemoteImages = (value) => {
 
   return parsed
     .map((image, index) => {
-      const url = sanitizeImageUrl(typeof image === 'string' ? image : image?.url);
+      const rawUrl = typeof image === 'string' ? image : image?.url;
+      const localPath = String(rawUrl || '').startsWith(STORE_UPLOAD_BASE) ? localStorePathFromPublicUrl(rawUrl) : '';
+      const url = localPath ? String(rawUrl).split('?')[0] : sanitizeImageUrl(rawUrl);
       if (!url) return null;
       return {
         url,
-        path: '',
+        path: localPath,
         name: String(image?.name || `temu-image-${index + 1}`).slice(0, 120),
-        mimeType: String(image?.mimeType || 'external/image'),
-        size: 0,
+        mimeType: String(image?.mimeType || (localPath ? 'image/jpeg' : 'external/image')),
+        size: Number(image?.size || 0),
       };
     })
     .filter(Boolean)
     .slice(0, 10);
+};
+
+const prepareRemoteImagesForSave = async (value, referer = '') => {
+  const parsedImages = parseRemoteImages(value);
+  const localImages = [];
+  const remoteUrls = [];
+
+  parsedImages.forEach((image) => {
+    if (image.path && image.url.startsWith(STORE_UPLOAD_BASE)) {
+      localImages.push(image);
+      return;
+    }
+    if (image.url && !isLikelyPlaceholderImageUrl(image.url)) {
+      remoteUrls.push(image.url);
+    }
+  });
+
+  const downloadedImages = remoteUrls.length ? await validateAndStoreRemoteImages(remoteUrls, referer) : [];
+  return [...localImages, ...downloadedImages].slice(0, 10);
 };
 
 const assertTemuUrl = (value) => {
@@ -944,7 +1160,13 @@ const selectImportPrices = (candidates, detectedDiscount, debug) => {
   return { currentCandidate: selectedCurrent, originalCandidate };
 };
 
-const buildImportedProductPreview = (url, html) => {
+const deriveOriginalPriceFromDiscount = (finalPrice, discountPercent = DEFAULT_IMPORT_DISCOUNT) => {
+  const safeDiscount = Math.max(0, Math.min(80, Number(discountPercent) || DEFAULT_IMPORT_DISCOUNT));
+  if (safeDiscount <= 0) return Math.max(1, Math.round(finalPrice));
+  return Math.max(Math.round(finalPrice), Math.round(finalPrice / (1 - safeDiscount / 100)));
+};
+
+const buildImportedProductPreview = async (url, html) => {
   const debug = createImportDebug(url);
   const scriptSources = extractScriptSources(html, debug);
   const [jsonProduct = {}] = extractJsonLdProducts(html, scriptSources);
@@ -956,11 +1178,8 @@ const buildImportedProductPreview = (url, html) => {
     decodeHtml(jsonProduct.description) ||
     decodeHtml(parseMetaValues(html, ['og:description', 'description', 'twitter:description'])[0]) ||
     title;
-  const images = extractImages(html, jsonProduct, scriptSources, debug).map((imageUrl, index) => ({
-    url: imageUrl,
-    name: `temu-image-${index + 1}`,
-    mimeType: 'external/image',
-  }));
+  const imageUrls = extractImages(html, jsonProduct, scriptSources, debug);
+  const images = await validateAndStoreRemoteImages(imageUrls, url, debug);
   const rating = normalizeNumber(jsonProduct.aggregateRating?.ratingValue, null);
   const prices = extractPriceCandidates(html, jsonProduct, scriptSources, debug);
   const detectedDiscount = extractDiscount(html, scriptSources);
@@ -971,21 +1190,24 @@ const buildImportedProductPreview = (url, html) => {
     throw createTemuImportError(TEMU_PRICE_ERROR, debug, 'لم يتم العثور على سعر حالي صالح بعد فحص المحددات والسكريبتات والميتا ومصدر الصفحة.');
   }
   const finalPrice = Math.round(currentPriceDh * DH_TO_COINS);
-  const originalPrice = Math.max(finalPrice, Math.round(originalPriceDh * DH_TO_COINS));
-  const discountPercent =
-    originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : detectedDiscount || 0;
+  const discountPercent = DEFAULT_IMPORT_DISCOUNT;
+  const originalPrice = deriveOriginalPriceFromDiscount(finalPrice, discountPercent);
 
   if (!title || !images.length) {
     throw createTemuImportError(TEMU_IMPORT_ERROR, debug, !title ? 'تعذر العثور على عنوان المنتج.' : 'تعذر العثور على صور المنتج.');
   }
 
   const stockQuantity = stableNumber(`${title}-${url}`, 6, 24);
-  const promoBadge = discountPercent >= 45 ? 'عرض محدود' : discountPercent >= 30 ? 'خصم قوي' : 'وصل حديثا';
+  const promoBadge = 'خصم 30%';
   debug.success = true;
   debug.failureReason = '';
   debug.parserSourceUsed = currentCandidate.source;
   debug.rawExtractedPrice = currentCandidate.rawText || `${currentCandidate.amount} ${currentCandidate.currency}`;
   debug.rawExtractedOriginalPrice = originalCandidate?.rawText || (originalCandidate ? `${originalCandidate.amount} ${originalCandidate.currency}` : null);
+  debug.importDiscountRule =
+    detectedDiscount > MAX_RELIABLE_IMPORT_DISCOUNT || !detectedDiscount
+      ? `discount defaulted to ${DEFAULT_IMPORT_DISCOUNT}%`
+      : `discount defaulted to ${DEFAULT_IMPORT_DISCOUNT}% by import policy`;
 
   return {
     title,
@@ -995,7 +1217,7 @@ const buildImportedProductPreview = (url, html) => {
     discountPercent: Math.max(0, Math.min(95, discountPercent)),
     finalPrice,
     stockQuantity,
-    featured: discountPercent >= 30,
+    featured: true,
     active: true,
     rating: rating && rating >= 0 && rating <= 5 ? Number(rating.toFixed(1)) : null,
     promoBadge,
@@ -1084,8 +1306,48 @@ const removeProductFiles = async (product) => {
   );
 };
 
+let lastImportedProductCleanupAt = 0;
+
+const normalizeImportedStoreProducts = async () => {
+  const now = Date.now();
+  if (now - lastImportedProductCleanupAt < 5 * 60 * 1000) return;
+  lastImportedProductCleanupAt = now;
+
+  const products = await StoreProduct.find({ sourceProvider: 'temu' });
+  await Promise.all(
+    products.map(async (product) => {
+      let changed = false;
+      const finalPrice = Number(product.finalPrice || 0);
+      const expectedOriginalPrice = finalPrice > 0 ? deriveOriginalPriceFromDiscount(finalPrice, DEFAULT_IMPORT_DISCOUNT) : product.originalPrice;
+
+      if (finalPrice > 0 && (product.discountPercent !== DEFAULT_IMPORT_DISCOUNT || product.originalPrice > expectedOriginalPrice * 1.8)) {
+        product.discountPercent = DEFAULT_IMPORT_DISCOUNT;
+        product.originalPrice = expectedOriginalPrice;
+        if (!product.promoBadge || /95|90|محدود/.test(product.promoBadge)) product.promoBadge = 'خصم 30%';
+        changed = true;
+      }
+
+      const seen = new Set();
+      const cleanImages = (product.images || []).filter((image) => {
+        const key = String(image.url || '').split('?')[0];
+        if (!key || seen.has(key) || isLikelyPlaceholderImageUrl(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      if (cleanImages.length !== (product.images || []).length) {
+        product.images = cleanImages;
+        changed = true;
+      }
+
+      if (changed) await product.save();
+    })
+  );
+};
+
 const listProducts = asyncHandler(async (req, res) => {
   await ensureStarterProducts();
+  await normalizeImportedStoreProducts();
 
   const category = String(req.query.category || '').trim();
   const query = { active: true };
@@ -1103,6 +1365,7 @@ const listProducts = asyncHandler(async (req, res) => {
 
 const getProduct = asyncHandler(async (req, res) => {
   await ensureStarterProducts();
+  await normalizeImportedStoreProducts();
 
   if (!isValidObjectId(req.params.id)) {
     res.status(404);
@@ -1225,6 +1488,7 @@ const listMyOrders = asyncHandler(async (req, res) => {
 
 const adminListProducts = asyncHandler(async (req, res) => {
   await ensureStarterProducts();
+  await normalizeImportedStoreProducts();
   const products = await StoreProduct.find().sort({ createdAt: -1 });
 
   res.json({
@@ -1237,7 +1501,7 @@ const adminPreviewProductImport = asyncHandler(async (req, res) => {
   try {
     const sourceUrl = assertTemuUrl(req.body.url);
     const html = await fetchTemuHtml(sourceUrl);
-    const product = buildImportedProductPreview(sourceUrl, html);
+    const product = await buildImportedProductPreview(sourceUrl, html);
     const debug = product.importDebug;
 
     res.json({
@@ -1277,7 +1541,7 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
   const discountPercent = Math.max(0, Math.min(95, normalizeNumber(req.body.discountPercent)));
   const finalPrice = normalizeNumber(req.body.finalPrice);
   const stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity)));
-  const remoteImages = parseRemoteImages(req.body.remoteImages);
+  const remoteImages = await prepareRemoteImagesForSave(req.body.remoteImages, req.body.sourceUrl || '');
   const uploadedImages = buildImagesFromFiles(req.files);
 
   if (!title || !Number.isFinite(originalPrice) || originalPrice <= 0 || !Number.isFinite(finalPrice) || finalPrice <= 0) {
@@ -1362,7 +1626,10 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   if (req.body.featured !== undefined) product.featured = req.body.featured === 'true' || req.body.featured === true;
   if (req.body.active !== undefined) product.active = req.body.active === 'true' || req.body.active === true;
 
-  const newImages = [...parseRemoteImages(req.body.remoteImages), ...buildImagesFromFiles(req.files)];
+  const newImages = [
+    ...(await prepareRemoteImagesForSave(req.body.remoteImages, req.body.sourceUrl || product.sourceUrl || '')),
+    ...buildImagesFromFiles(req.files),
+  ];
   if (newImages.length) {
     product.images = [...product.images, ...newImages].slice(0, 10);
   }
