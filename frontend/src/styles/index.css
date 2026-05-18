@@ -591,21 +591,36 @@ select {
 
 .portal-choice-copy h1 {
   margin: 0;
-  color: var(--portal-text);
-  font-size: clamp(2.05rem, 8vw, 4.45rem);
-  line-height: 1.16;
+  display: grid;
+  gap: 0.18rem;
+  color: transparent;
+  background: linear-gradient(135deg, #ffffff 0%, #dffcf6 28%, var(--portal-cyan) 58%, var(--portal-gold) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: clamp(2rem, 7.6vw, 4.35rem);
+  line-height: 1.18;
   font-weight: 950;
   text-shadow:
-    0 0 32px rgba(66, 245, 215, 0.12),
+    0 0 22px rgba(66, 245, 215, 0.18),
+    0 0 54px rgba(246, 207, 117, 0.08),
     0 22px 70px rgba(0, 0, 0, 0.5);
+}
+
+.portal-choice-copy h1 span {
+  display: block;
 }
 
 .portal-choice-copy p {
   max-width: 30rem;
   margin: 0 auto;
-  color: rgba(230, 242, 250, 0.76);
+  padding: 0.26rem 0.72rem;
+  color: rgba(230, 242, 250, 0.82);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
   font-size: clamp(0.96rem, 3vw, 1.18rem);
-  line-height: 1.8;
+  line-height: 1.65;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18);
 }
 
 .portal-choice-actions {
@@ -668,22 +683,39 @@ select {
   top: max(0.85rem, env(safe-area-inset-top));
   left: max(0.85rem, env(safe-area-inset-left));
   z-index: 120;
-  width: 3.1rem;
-  height: 3.1rem;
-  display: grid;
-  place-items: center;
+  width: 5.1rem;
+  height: 5.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
   pointer-events: auto;
   color: #06100d;
   background:
-    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.72), transparent 1.1rem),
-    linear-gradient(135deg, var(--portal-green), var(--portal-cyan));
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.74), transparent 1.35rem),
+    linear-gradient(135deg, var(--portal-green, var(--green)), var(--portal-cyan, var(--cyan)));
   border: 1px solid rgba(184, 255, 239, 0.58);
   border-radius: 999px;
   box-shadow:
-    0 0 0 7px rgba(66, 245, 215, 0.08),
-    0 16px 46px rgba(66, 245, 215, 0.2),
+    0 0 0 8px rgba(66, 245, 215, 0.08),
+    0 16px 48px rgba(66, 245, 215, 0.24),
     0 22px 70px rgba(0, 0, 0, 0.38);
   transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.portal-support-fab svg {
+  flex: 0 0 auto;
+}
+
+.portal-support-fab span {
+  display: block;
+  max-width: 4.1rem;
+  color: #06100d;
+  font-size: 0.58rem;
+  font-weight: 950;
+  line-height: 1.18;
+  text-align: center;
 }
 
 .portal-support-fab:hover {
@@ -692,6 +724,11 @@ select {
     0 0 0 9px rgba(66, 245, 215, 0.1),
     0 18px 54px rgba(66, 245, 215, 0.28),
     0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.app-support-fab {
+  top: 0.75rem;
+  left: 0.75rem;
 }
 
 .portal-back-button {
@@ -2242,8 +2279,18 @@ select {
   .portal-support-fab {
     top: max(0.7rem, env(safe-area-inset-top));
     left: max(0.7rem, env(safe-area-inset-left));
-    width: 2.8rem;
-    height: 2.8rem;
+    width: 4.45rem;
+    height: 4.45rem;
+  }
+
+  .portal-support-fab svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .portal-support-fab span {
+    max-width: 3.55rem;
+    font-size: 0.52rem;
   }
 
   .portal-back-button {
@@ -2806,6 +2853,7 @@ label {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+  padding-left: 5.7rem;
 }
 
 .topbar h1 {

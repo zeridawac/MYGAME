@@ -3,6 +3,7 @@ import {
   Banknote,
   Crown,
   Gift,
+  Headphones,
   Home,
   LogOut,
   ShoppingBag,
@@ -63,6 +64,10 @@ const AppLayout = () => {
       </aside>
 
       <main className="main-content">
+        <button className="portal-support-fab app-support-fab" type="button" onClick={() => navigate('/?support=1')} aria-label="التواصل مع الأدمن">
+          <Headphones size={22} />
+          <span>تواصل مع الأدمن</span>
+        </button>
         <header className="topbar">
           <div>
             <span className="eyebrow">لوحة التحكم</span>

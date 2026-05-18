@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AdminRoute from './components/AdminRoute.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -18,8 +18,10 @@ import Store from './pages/Store.jsx';
 
 const PortalEntry = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const openSupport = new URLSearchParams(location.search).get('support') === '1';
 
-  return <ProjectSuspended onEnterSite={() => navigate('/login')} />;
+  return <ProjectSuspended openSupport={openSupport} onEnterSite={() => navigate('/login')} />;
 };
 
 const App = () => {

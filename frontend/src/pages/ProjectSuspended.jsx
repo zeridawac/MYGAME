@@ -202,10 +202,14 @@ const EntryChoice = ({ onOpenPortal, onEnterSite }) => (
   <section className="portal-entry-choice" aria-label="اختيار طريقة الدخول">
     <button className="portal-support-fab" type="button" onClick={onOpenPortal} aria-label="التواصل مع الأدمن">
       <Headphones size={22} />
+      <span>تواصل مع الأدمن</span>
     </button>
 
     <div className="portal-choice-copy">
-      <h1>مرحبا في متجر رضا للإستثمار والتسوق واللعب</h1>
+      <h1>
+        <span>مرحبا في متجر رضا</span>
+        <span>للإستثمار والتسوق واللعب</span>
+      </h1>
       <p>كل شيء في مكان واحد</p>
     </div>
 
@@ -921,9 +925,9 @@ const UserResetModal = ({ balance, error, saving, onBalanceChange, onClose, onCo
   </div>
 );
 
-const ProjectSuspended = ({ onEnterSite = () => {} }) => {
+const ProjectSuspended = ({ openSupport = false, onEnterSite = () => {} }) => {
   const [session, setSession] = useState(readPortalSession);
-  const [entryMode, setEntryMode] = useState('choice');
+  const [entryMode, setEntryMode] = useState(() => (openSupport ? 'portal' : 'choice'));
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState(0);
@@ -1368,6 +1372,12 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
     await requestLandingLocation();
     onEnterSite();
   }, [onEnterSite]);
+
+  useEffect(() => {
+    if (openSupport && !session?.code) {
+      setEntryMode('portal');
+    }
+  }, [openSupport, session?.code]);
 
   useEffect(() => {
     if (!session?.code) {
