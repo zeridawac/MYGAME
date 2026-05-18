@@ -13,6 +13,7 @@ const TEMU_IMPORT_ERROR = 'تعذر جلب بيانات المنتج';
 const TEMU_PRICE_ERROR = 'تعذر استخراج سعر المنتج';
 const DH_TO_COINS = 10;
 const MIN_PRODUCT_PRICE_DH = 5;
+const MIN_IMPORT_REALISTIC_PRICE_DH = 20;
 const DEFAULT_IMPORT_DISCOUNT = 30;
 const MAX_RELIABLE_IMPORT_DISCOUNT = 50;
 const MIN_PRODUCT_IMAGE_BYTES = 6 * 1024;
@@ -350,8 +351,26 @@ const serializePriceCandidate = (candidate) =>
         source: candidate.source,
         key: candidate.key || '',
         rawText: candidate.rawText || '',
-      }
+    }
     : null;
+
+const isVisiblePriceSource = (source = '') => ['selector', 'visible-html'].includes(source);
+const isHydratedPriceSource = (source = '') => ['__NEXT_DATA__', 'window.NUXT', 'hydration-state', 'json-script'].includes(source);
+const isStructuredPriceSource = (source = '') => ['json-ld', 'json-ld-walk', 'meta', 'embedded-json'].includes(source);
+const isMadPrice = (candidate) => normalizeCurrency(candidate?.currency) === 'MAD';
+const isRealisticImportPrice = (candidate) =>
+  candidate && candidate.dhPrice >= MIN_IMPORT_REALISTIC_PRICE_DH && candidate.dhPrice <= 100000;
+
+const productContextScore = (candidate) => {
+  const context = decodeEscapedText(`${candidate?.context || ''} ${candidate?.key || ''} ${candidate?.rawText || ''}`).toLowerCase();
+  let score = 0;
+  if (/buy|cart|checkout|purchase|order|sku|product|goods|sale|discount|deal|price|promo|اشتر|شراء|السلة|منتج|السعر|خصم|عرض/i.test(context)) score += 2;
+  if (/coupon|shipping|delivery|voucher|tax|fee|review|rating|sold|points|installment/i.test(context)) score -= 4;
+  if (candidate?.kind === 'current') score += 2;
+  if (candidate?.kind === 'unknown') score += 1;
+  if (candidate?.kind === 'original') score -= 1;
+  return score;
+};
 
 const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source = 'page', meta = {}) => {
   const parsedAmount = normalizePrice(amount, meta.divisor || 1);
@@ -615,7 +634,7 @@ const scanSelectorLikePrices = (html, candidates, debug) => {
     const beforeCount = candidates.length;
     while (match) {
       matches += 1;
-      scanCurrencyText(stripTags(match[1] || match[0]), 'selector', candidates, null);
+      scanCurrencyText(match[0], 'selector', candidates, null);
       scanKeyValuePrices(match[1] || match[0], 'selector', candidates);
       match = regex.exec(html);
     }
@@ -728,6 +747,61 @@ const isLikelyPlaceholderImageUrl = (url = '') => {
   );
 };
 
+const isLikelyProductImageUrl = (url = '') => {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const pathName = parsed.pathname.toLowerCase();
+    const full = `${host}${pathName}${parsed.search.toLowerCase()}`;
+    const trustedHost =
+      host === 'img.kwcdn.com' ||
+      host.endsWith('.img.kwcdn.com') ||
+      host === 'aimg.kwcdn.com' ||
+      host.endsWith('.kwcdn.com') ||
+      host.includes('temucdn') ||
+      host.includes('temu-img');
+
+    if (!trustedHost && !/\.(jpe?g|png|webp)$/i.test(pathName)) return false;
+    if (isLikelyPlaceholderImageUrl(full)) return false;
+
+    return (
+      /\.(jpe?g|png|webp)$/i.test(pathName) ||
+      /\/product\/|\/goods\/|\/review\/|\/upload\/|\/image\/|\/img\//i.test(pathName) ||
+      /imageView|imageMogr|thumbnail|format=webp|w=\d{3,}|width=\d{3,}/i.test(parsed.search)
+    );
+  } catch {
+    return false;
+  }
+};
+
+const expandImageUrlVariants = (url = '') => {
+  const clean = sanitizeImageUrl(url);
+  if (!clean) return [];
+  const variants = [clean];
+  const upgraded = upgradeImageUrl(clean);
+  if (upgraded && upgraded !== clean) variants.push(upgraded);
+
+  try {
+    const parsed = new URL(clean);
+    if (parsed.hostname.toLowerCase().includes('kwcdn.com')) {
+      const high = new URL(clean);
+      high.search = '';
+      variants.push(high.toString());
+
+      const webp = new URL(clean);
+      webp.searchParams.set('imageView2', '2');
+      webp.searchParams.set('w', '1200');
+      webp.searchParams.set('q', '80');
+      webp.searchParams.set('format', 'webp');
+      variants.push(webp.toString());
+    }
+  } catch {
+    // Ignore malformed variants; sanitizeImageUrl already handled the base URL.
+  }
+
+  return unique(variants).filter((item) => !isLikelyPlaceholderImageUrl(item));
+};
+
 const extractImages = (html, jsonProduct, scriptSources = [], debug) => {
   const jsonImages = Array.isArray(jsonProduct?.image) ? jsonProduct.image : [jsonProduct?.image];
   const metaImages = parseMetaValues(html, ['og:image', 'og:image:secure_url', 'twitter:image']);
@@ -768,24 +842,13 @@ const extractImages = (html, jsonProduct, scriptSources = [], debug) => {
   });
 
   const imageLike = [...jsonImages, ...jsonDiscovered, ...metaImages, ...attributeMatches, ...urlMatches]
-    .map((url) => {
+    .flatMap((url) => {
       const normalized = String(url || '').startsWith('//') ? `https:${url}` : url;
-      return upgradeImageUrl(sanitizeImageUrl(normalized));
+      return expandImageUrlVariants(normalized);
     })
     .filter((url) => {
       if (!url || isLikelyPlaceholderImageUrl(url)) return false;
-      const lowered = url.toLowerCase();
-      return (
-        /\.(jpg|jpeg|png|webp)(?:$|\?)/i.test(lowered) ||
-        lowered.includes('img.kwcdn.com') ||
-        lowered.includes('temu') ||
-        lowered.includes('kwcdn') ||
-        lowered.includes('image') ||
-        lowered.includes('img') ||
-        lowered.includes('thumb') ||
-        lowered.includes('thumbnail') ||
-        lowered.includes('gallery')
-      );
+      return isLikelyProductImageUrl(url);
     });
 
   const byBaseUrl = new Map();
@@ -851,7 +914,7 @@ const getImageDimensions = (buffer, contentType = '') => {
   return null;
 };
 
-const fetchImageBuffer = async (url, referer = '') => {
+const fetchImageBuffer = async (url, referer = '', cookieHeader = '') => {
   if (typeof fetch !== 'function') return { ok: false, reason: 'fetch is not available' };
   if (isLikelyPlaceholderImageUrl(url)) return { ok: false, reason: 'placeholder/icon url' };
 
@@ -864,7 +927,11 @@ const fetchImageBuffer = async (url, referer = '') => {
       headers: {
         accept: 'image/avif,image/webp,image/apng,image/png,image/jpeg,image/*,*/*;q=0.8',
         'accept-language': 'ar,en-US;q=0.9,en;q=0.8',
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
         referer: referer || 'https://www.temu.com/',
+        'sec-fetch-dest': 'image',
+        'sec-fetch-mode': 'no-cors',
+        'sec-fetch-site': 'cross-site',
         'user-agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
       },
@@ -931,14 +998,14 @@ const storeImageBuffer = async (url, imageData, index = 0) => {
   };
 };
 
-const validateAndStoreRemoteImages = async (urls = [], referer = '', debug) => {
-  const candidates = unique(urls.map((url) => upgradeImageUrl(sanitizeImageUrl(url))).filter((url) => url && !isLikelyPlaceholderImageUrl(url))).slice(0, 24);
+const validateAndStoreRemoteImages = async (urls = [], referer = '', debug, cookieHeader = '') => {
+  const candidates = unique(urls.flatMap(expandImageUrlVariants).filter((url) => url && isLikelyProductImageUrl(url))).slice(0, 32);
   const results = [];
   const validationLog = [];
 
   for (const url of candidates) {
     if (results.length >= 10) break;
-    const imageData = await fetchImageBuffer(url, referer);
+    const imageData = await fetchImageBuffer(url, referer, cookieHeader);
     validationLog.push({
       url: url.slice(0, 180),
       ok: imageData.ok,
@@ -1012,7 +1079,7 @@ const parseRemoteImages = (value) => {
     .slice(0, 10);
 };
 
-const prepareRemoteImagesForSave = async (value, referer = '') => {
+const prepareRemoteImagesForSave = async (value, referer = '', cookieHeader = '') => {
   const parsedImages = parseRemoteImages(value);
   const localImages = [];
   const remoteUrls = [];
@@ -1027,7 +1094,7 @@ const prepareRemoteImagesForSave = async (value, referer = '') => {
     }
   });
 
-  const downloadedImages = remoteUrls.length ? await validateAndStoreRemoteImages(remoteUrls, referer) : [];
+  const downloadedImages = remoteUrls.length ? await validateAndStoreRemoteImages(remoteUrls, referer, undefined, cookieHeader) : [];
   return [...localImages, ...downloadedImages].slice(0, 10);
 };
 
@@ -1075,7 +1142,14 @@ const fetchTemuHtml = async (url) => {
       throw new Error(TEMU_IMPORT_ERROR);
     }
 
-    return response.text();
+    return {
+      html: await response.text(),
+      cookieHeader: String(response.headers.get('set-cookie') || '')
+        .split(/,\s*(?=[^;,]+=)/)
+        .map((cookie) => cookie.split(';')[0])
+        .filter(Boolean)
+        .join('; '),
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -1085,28 +1159,50 @@ const scorePriceCandidate = (candidate) => {
   const sourceScore = {
     selector: 0,
     'visible-html': 1,
-    'page-source': 2,
-    __NEXT_DATA__: 3,
-    'window.NUXT': 3,
-    'hydration-state': 3,
-    'json-script': 4,
+    __NEXT_DATA__: 2,
+    'window.NUXT': 2,
+    'hydration-state': 2,
+    'json-script': 3,
+    'json-ld': 4,
+    'json-ld-walk': 4,
     meta: 5,
-    'json-ld': 6,
-    'json-ld-walk': 6,
-    'embedded-json': 7,
+    'embedded-json': 6,
+    'page-source': 9,
   };
-  const kindScore = candidate.kind === 'current' ? 0 : candidate.kind === 'original' ? 1 : 2;
-  return (sourceScore[candidate.source] ?? 8) * 10 + kindScore;
+  const kindScore = candidate.kind === 'current' ? 0 : candidate.kind === 'unknown' ? 1 : 2;
+  return (sourceScore[candidate.source] ?? 8) * 10 + kindScore - productContextScore(candidate);
 };
 
 const pickBestCurrentPrice = (candidates) => {
-  const explicitCurrent = candidates.filter((candidate) => candidate.kind === 'current');
-  if (explicitCurrent.length) {
-    return explicitCurrent.sort((a, b) => scorePriceCandidate(a) - scorePriceCandidate(b) || a.dhPrice - b.dhPrice)[0];
+  const realistic = candidates.filter((candidate) => isRealisticImportPrice(candidate) && candidate.kind !== 'original');
+  const sortedLargest = (items) =>
+    [...items].sort((a, b) => productContextScore(b) - productContextScore(a) || b.dhPrice - a.dhPrice || scorePriceCandidate(a) - scorePriceCandidate(b));
+
+  const visibleMad = sortedLargest(realistic.filter((candidate) => isVisiblePriceSource(candidate.source) && isMadPrice(candidate)));
+  if (visibleMad.length) return visibleMad[0];
+
+  const hydratedMad = sortedLargest(realistic.filter((candidate) => isHydratedPriceSource(candidate.source) && isMadPrice(candidate)));
+  if (hydratedMad.length) return hydratedMad[0];
+
+  const visibleAny = sortedLargest(realistic.filter((candidate) => isVisiblePriceSource(candidate.source)));
+  if (visibleAny.length) return visibleAny[0];
+
+  const hydratedAny = sortedLargest(realistic.filter((candidate) => isHydratedPriceSource(candidate.source)));
+  if (hydratedAny.length) return hydratedAny[0];
+
+  const structuredMad = sortedLargest(realistic.filter((candidate) => isStructuredPriceSource(candidate.source) && isMadPrice(candidate)));
+  if (structuredMad.length) return structuredMad[0];
+
+  const structuredAny = sortedLargest(realistic.filter((candidate) => isStructuredPriceSource(candidate.source)));
+  if (structuredAny.length) {
+    return structuredAny.sort((a, b) => scorePriceCandidate(a) - scorePriceCandidate(b) || b.dhPrice - a.dhPrice)[0];
   }
 
-  const unknown = candidates.filter((candidate) => candidate.kind === 'unknown').sort((a, b) => a.dhPrice - b.dhPrice);
-  return unknown[0] || null;
+  const pageSourceMad = sortedLargest(realistic.filter((candidate) => candidate.source === 'page-source' && isMadPrice(candidate)));
+  if (pageSourceMad.length) return pageSourceMad[0];
+
+  const pageSourceAny = sortedLargest(realistic.filter((candidate) => candidate.source === 'page-source'));
+  return pageSourceAny[0] || null;
 };
 
 const pickBestOriginalPrice = (candidates, currentCandidate) => {
@@ -1166,7 +1262,7 @@ const deriveOriginalPriceFromDiscount = (finalPrice, discountPercent = DEFAULT_I
   return Math.max(Math.round(finalPrice), Math.round(finalPrice / (1 - safeDiscount / 100)));
 };
 
-const buildImportedProductPreview = async (url, html) => {
+const buildImportedProductPreview = async (url, html, cookieHeader = '') => {
   const debug = createImportDebug(url);
   const scriptSources = extractScriptSources(html, debug);
   const [jsonProduct = {}] = extractJsonLdProducts(html, scriptSources);
@@ -1179,7 +1275,7 @@ const buildImportedProductPreview = async (url, html) => {
     decodeHtml(parseMetaValues(html, ['og:description', 'description', 'twitter:description'])[0]) ||
     title;
   const imageUrls = extractImages(html, jsonProduct, scriptSources, debug);
-  const images = await validateAndStoreRemoteImages(imageUrls, url, debug);
+  const images = await validateAndStoreRemoteImages(imageUrls, url, debug, cookieHeader);
   const rating = normalizeNumber(jsonProduct.aggregateRating?.ratingValue, null);
   const prices = extractPriceCandidates(html, jsonProduct, scriptSources, debug);
   const detectedDiscount = extractDiscount(html, scriptSources);
@@ -1328,15 +1424,28 @@ const normalizeImportedStoreProducts = async () => {
       }
 
       const seen = new Set();
+      const localImages = [];
+      const remoteImageUrls = [];
       const cleanImages = (product.images || []).filter((image) => {
         const key = String(image.url || '').split('?')[0];
         if (!key || seen.has(key) || isLikelyPlaceholderImageUrl(key)) return false;
         seen.add(key);
+        if (String(image.url || '').startsWith(STORE_UPLOAD_BASE) && image.path) {
+          localImages.push(image);
+        } else if (isLikelyProductImageUrl(image.url)) {
+          remoteImageUrls.push(image.url);
+        }
         return true;
       });
 
       if (cleanImages.length !== (product.images || []).length) {
         product.images = cleanImages;
+        changed = true;
+      }
+
+      if (remoteImageUrls.length) {
+        const downloadedImages = await validateAndStoreRemoteImages(remoteImageUrls, product.sourceUrl || '');
+        product.images = [...localImages, ...downloadedImages].slice(0, 10);
         changed = true;
       }
 
@@ -1500,8 +1609,8 @@ const adminListProducts = asyncHandler(async (req, res) => {
 const adminPreviewProductImport = asyncHandler(async (req, res) => {
   try {
     const sourceUrl = assertTemuUrl(req.body.url);
-    const html = await fetchTemuHtml(sourceUrl);
-    const product = await buildImportedProductPreview(sourceUrl, html);
+    const { html, cookieHeader } = await fetchTemuHtml(sourceUrl);
+    const product = await buildImportedProductPreview(sourceUrl, html, cookieHeader);
     const debug = product.importDebug;
 
     res.json({

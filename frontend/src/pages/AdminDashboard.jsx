@@ -936,11 +936,7 @@ const AdminDashboard = () => {
                     </article>
                     <article>
                       <span>الأصلي</span>
-                      <strong>
-                        {storeForm.sourceOriginalPriceAmount
-                          ? `${storeForm.sourceOriginalPriceAmount} ${storeForm.sourceCurrency || 'DH'}`
-                          : `${formatCoins(storeForm.originalPrice || 0)} كوين`}
-                      </strong>
+                      <strong>{formatCoins(storeForm.originalPrice || 0)} كوين</strong>
                     </article>
                     <article>
                       <span>النهائي</span>
