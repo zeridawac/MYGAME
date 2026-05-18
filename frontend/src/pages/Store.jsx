@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, ShoppingBag, ShoppingCart, Sparkles, Zap } from 'lucide-react';
 import api from '../api/config.js';
 import EmptyState from '../components/EmptyState.jsx';
@@ -70,6 +70,7 @@ const Store = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const cart = useCart();
+  const navigate = useNavigate();
 
   const filteredProducts = useMemo(
     () => (activeCategory ? products.filter((product) => product.category === activeCategory) : products),
@@ -110,6 +111,11 @@ const Store = () => {
   }, []);
 
   const addToCart = (product) => {
+    if (product.isClothing) {
+      navigate(`/store/${product.id || product._id}`);
+      showToast('المرجو اختيار المقاس', 'error');
+      return;
+    }
     cart.addItem(product);
     showToast('تمت إضافة المنتج للسلة', 'success');
   };

@@ -108,6 +108,40 @@ const normalizeOptionalNumber = (value) => {
   return normalizeNumber(value, null);
 };
 
+const defaultClothingSizes = ['S', 'M', 'L', 'XL', 'XXL'];
+
+const normalizeBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  return ['true', '1', 'yes', 'نعم'].includes(String(value).trim().toLowerCase());
+};
+
+const normalizeSizes = (value) => {
+  let rawSizes = value;
+  if (typeof value === 'string') {
+    try {
+      rawSizes = JSON.parse(value);
+    } catch {
+      rawSizes = value.split(',');
+    }
+  }
+
+  if (!Array.isArray(rawSizes)) return [];
+
+  const seen = new Set();
+  return rawSizes
+    .map((size) => String(size || '').trim())
+    .filter(Boolean)
+    .map((size) => size.slice(0, 18))
+    .filter((size) => {
+      const key = size.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 16);
+};
+
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
 const decodeHtml = (value = '') =>
@@ -1326,6 +1360,8 @@ const presentProduct = (product) => ({
   discountPercent: product.discountPercent,
   finalPrice: product.finalPrice,
   stockQuantity: product.stockQuantity,
+  isClothing: Boolean(product.isClothing),
+  sizes: product.sizes || [],
   rating: product.rating,
   promoBadge: product.promoBadge,
   sourceUrl: product.sourceUrl,
@@ -1487,6 +1523,7 @@ const checkout = asyncHandler(async (req, res) => {
     .map((item) => ({
       productId: String(item.productId || item.id || '').trim(),
       quantity: Math.max(1, Math.min(20, Math.floor(Number(item.quantity || 1)))),
+      size: String(item.size || '').trim().slice(0, 18),
     }))
     .filter((item) => item.productId);
 
@@ -1500,6 +1537,10 @@ const checkout = asyncHandler(async (req, res) => {
     active: true,
   });
   const productMap = new Map(products.map((product) => [product._id.toString(), product]));
+  const requestedQuantities = normalizedItems.reduce((map, item) => {
+    map.set(item.productId, (map.get(item.productId) || 0) + item.quantity);
+    return map;
+  }, new Map());
   const orderItems = [];
 
   for (const item of normalizedItems) {
@@ -1509,14 +1550,27 @@ const checkout = asyncHandler(async (req, res) => {
       throw new Error('أحد المنتجات لم يعد متاحا');
     }
 
-    if (product.stockQuantity < item.quantity) {
+    if (product.stockQuantity < requestedQuantities.get(item.productId)) {
       res.status(400);
       throw new Error(`الكمية غير متوفرة: ${product.title}`);
+    }
+
+    if (product.isClothing) {
+      const availableSizes = product.sizes || [];
+      if (!item.size) {
+        res.status(400);
+        throw new Error('المرجو اختيار المقاس');
+      }
+      if (availableSizes.length && !availableSizes.includes(item.size)) {
+        res.status(400);
+        throw new Error('المقاس غير متوفر');
+      }
     }
 
     orderItems.push({
       product,
       quantity: item.quantity,
+      size: product.isClothing ? item.size : '',
       unitPrice: product.finalPrice,
       totalPrice: product.finalPrice * item.quantity,
     });
@@ -1547,6 +1601,7 @@ const checkout = asyncHandler(async (req, res) => {
       imageUrl: item.product.images?.[0]?.url || '',
       unitPrice: item.unitPrice,
       quantity: item.quantity,
+      size: item.size,
       totalPrice: item.totalPrice,
     })),
   });
@@ -1594,6 +1649,8 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
   const finalPrice = normalizeNumber(req.body.finalPrice);
   const originalPrice = normalizeNumber(req.body.originalPrice, deriveOriginalPriceFromDiscount(finalPrice, discountPercent));
   const stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity)));
+  const isClothing = normalizeBoolean(req.body.isClothing);
+  const sizes = isClothing ? normalizeSizes(req.body.sizes) : [];
   const remoteImages = prepareRemoteImagesForSave(req.body.remoteImages);
   const uploadedImages = buildImagesFromFiles(req.files);
 
@@ -1610,6 +1667,8 @@ const adminCreateProduct = asyncHandler(async (req, res) => {
     discountPercent,
     finalPrice,
     stockQuantity,
+    isClothing,
+    sizes: isClothing && sizes.length ? sizes : isClothing ? defaultClothingSizes : [],
     rating: normalizeOptionalNumber(req.body.rating),
     promoBadge: String(req.body.promoBadge || '').trim(),
     sourceUrl: String(req.body.sourceUrl || '').trim(),
@@ -1667,6 +1726,10 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
     product.finalPrice = nextFinalPrice;
   }
   if (req.body.stockQuantity !== undefined) product.stockQuantity = Math.max(0, Math.floor(normalizeNumber(req.body.stockQuantity, product.stockQuantity)));
+  if (req.body.isClothing !== undefined) product.isClothing = normalizeBoolean(req.body.isClothing, product.isClothing);
+  if (req.body.sizes !== undefined) product.sizes = product.isClothing ? normalizeSizes(req.body.sizes) : [];
+  if (product.isClothing && (!product.sizes || !product.sizes.length)) product.sizes = defaultClothingSizes;
+  if (!product.isClothing) product.sizes = [];
   if (req.body.rating !== undefined) product.rating = normalizeOptionalNumber(req.body.rating);
   if (req.body.promoBadge !== undefined) product.promoBadge = String(req.body.promoBadge).trim();
   if (req.body.sourceUrl !== undefined) product.sourceUrl = String(req.body.sourceUrl).trim();

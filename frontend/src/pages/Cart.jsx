@@ -26,7 +26,7 @@ const Cart = () => {
     setSuccessMessage('');
     try {
       const { data } = await api.post('/store/checkout', {
-        items: cart.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+        items: cart.items.map((item) => ({ productId: item.productId, quantity: item.quantity, size: item.size || '' })),
       });
       updateUser(data.user);
       cart.clearCart();
@@ -55,27 +55,31 @@ const Cart = () => {
       {cart.items.length ? (
         <section className="cart-layout">
           <div className="cart-items-list">
-            {cart.items.map((item) => (
-              <article className="cart-item-card" key={item.productId}>
+            {cart.items.map((item) => {
+              const itemKey = item.cartKey || `${item.productId}::${item.size || 'default'}`;
+              return (
+              <article className="cart-item-card" key={itemKey}>
                 <img src={productImageUrl(item)} alt={item.title} />
                 <div>
                   <strong>{item.title}</strong>
+                  {item.size ? <small className="cart-item-size">المقاس: {item.size}</small> : null}
                   <span>{formatCoins(item.finalPrice)} كوين</span>
                   <div className="store-qty-row">
-                    <button type="button" onClick={() => cart.updateQuantity(item.productId, item.quantity - 1)}>
+                    <button type="button" onClick={() => cart.updateQuantity(itemKey, item.quantity - 1)}>
                       <Minus size={14} />
                     </button>
                     <b>{item.quantity}</b>
-                    <button type="button" onClick={() => cart.updateQuantity(item.productId, item.quantity + 1)}>
+                    <button type="button" onClick={() => cart.updateQuantity(itemKey, item.quantity + 1)}>
                       <Plus size={14} />
                     </button>
-                    <button type="button" onClick={() => cart.removeItem(item.productId)}>
+                    <button type="button" onClick={() => cart.removeItem(itemKey)}>
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           <aside className="cart-summary-card">

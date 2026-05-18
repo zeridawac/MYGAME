@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowRight, PackageCheck, ShoppingCart, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, PackageCheck, ShoppingCart, Sparkles, X, ZoomIn, ZoomOut } from 'lucide-react';
 import api from '../api/config.js';
 import Loading from '../components/Loading.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCoins } from '../utils/coins.js';
 import { productImageUrl, resolveStoreAssetUrl } from '../utils/storeImages.js';
+
+const fallbackSizes = ['S', 'M', 'L', 'XL', 'XXL'];
 
 const productImageCandidates = (product) => {
   const urls = (product?.images || [])
@@ -24,9 +26,13 @@ const ProductDetails = () => {
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [activeImage, setActiveImage] = useState(0);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [lightboxZoom, setLightboxZoom] = useState(1);
   const [failedImages, setFailedImages] = useState([]);
   const [mainImageReady, setMainImageReady] = useState(false);
+  const [selectedSize, setSelectedSize] = useState('');
   const [loading, setLoading] = useState(true);
+  const touchState = useRef({ x: 0, distance: 0, zoom: 1 });
   const cart = useCart();
   const { showToast } = useToast();
 
@@ -38,6 +44,9 @@ const ProductDetails = () => {
         setProduct(data.product);
         setRelated(data.related || []);
         setActiveImage(0);
+        setLightboxIndex(null);
+        setLightboxZoom(1);
+        setSelectedSize('');
         setFailedImages([]);
         setMainImageReady(false);
       } catch (error) {
@@ -53,13 +62,19 @@ const ProductDetails = () => {
 
   const addToCart = () => {
     if (!product) return;
-    cart.addItem(product);
+    if (product.isClothing && !selectedSize) {
+      showToast('المرجو اختيار المقاس', 'error');
+      return;
+    }
+    cart.addItem(product, 1, { size: selectedSize });
     showToast('تمت إضافة المنتج للسلة', 'success');
   };
 
   const gallery = productImageCandidates(product).filter((url) => !failedImages.includes(url));
   const mainImage = gallery[activeImage] || gallery[0] || '';
   const hasDiscount = product ? product.originalPrice > product.finalPrice || product.discountPercent > 0 : false;
+  const availableSizes = product?.isClothing ? product.sizes?.length ? product.sizes : fallbackSizes : [];
+  const lightboxImage = lightboxIndex === null ? '' : gallery[lightboxIndex] || gallery[0] || '';
 
   const markImageFailed = (url) => {
     setFailedImages((current) => (current.includes(url) ? current : [...current, url]));
@@ -87,6 +102,63 @@ const ProductDetails = () => {
     }
   }, [activeImage, gallery.length]);
 
+  const openLightbox = (index = activeImage) => {
+    if (!gallery.length) return;
+    setLightboxIndex(Math.max(0, Math.min(index, gallery.length - 1)));
+    setLightboxZoom(1);
+  };
+
+  const closeLightbox = () => {
+    setLightboxIndex(null);
+    setLightboxZoom(1);
+  };
+
+  const moveLightbox = (direction) => {
+    if (!gallery.length) return;
+    setLightboxZoom(1);
+    setLightboxIndex((current) => {
+      const safeCurrent = current ?? 0;
+      return (safeCurrent + direction + gallery.length) % gallery.length;
+    });
+  };
+
+  const touchDistance = (touches) => {
+    if (touches.length < 2) return 0;
+    const [first, second] = touches;
+    return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+  };
+
+  const handleLightboxTouchStart = (event) => {
+    if (event.touches.length === 2) {
+      touchState.current = {
+        x: 0,
+        distance: touchDistance(event.touches),
+        zoom: lightboxZoom,
+      };
+      return;
+    }
+
+    touchState.current = {
+      x: event.touches[0]?.clientX || 0,
+      distance: 0,
+      zoom: lightboxZoom,
+    };
+  };
+
+  const handleLightboxTouchMove = (event) => {
+    if (event.touches.length !== 2 || !touchState.current.distance) return;
+    const nextZoom = Math.max(1, Math.min(3, touchState.current.zoom * (touchDistance(event.touches) / touchState.current.distance)));
+    setLightboxZoom(nextZoom);
+  };
+
+  const handleLightboxTouchEnd = (event) => {
+    if (!touchState.current.x || !event.changedTouches[0] || lightboxZoom > 1.05) return;
+    const deltaX = event.changedTouches[0].clientX - touchState.current.x;
+    if (Math.abs(deltaX) > 55) {
+      moveLightbox(deltaX > 0 ? -1 : 1);
+    }
+  };
+
   if (loading || !product) {
     return <Loading />;
   }
@@ -103,7 +175,9 @@ const ProductDetails = () => {
           {mainImage ? (
             <>
               <div className={`product-main-image-wrap ${mainImageReady ? 'loaded' : ''}`}>
-                <img className="product-main-image" src={mainImage} alt={product.title} onError={() => markImageFailed(mainImage)} />
+                <button className="product-main-image-button" type="button" onClick={() => openLightbox(activeImage)} aria-label="تكبير الصورة">
+                  <img className="product-main-image" src={mainImage} alt={product.title} onError={() => markImageFailed(mainImage)} />
+                </button>
               </div>
               {gallery.length > 1 ? (
                 <div className="product-thumbs">
@@ -112,7 +186,10 @@ const ProductDetails = () => {
                       className={activeImage === index ? 'active' : ''}
                       type="button"
                       key={`${imageUrl}-${index}`}
-                      onClick={() => setActiveImage(index)}
+                      onClick={() => {
+                        setActiveImage(index);
+                        openLightbox(index);
+                      }}
                       aria-label={`صورة المنتج ${index + 1}`}
                     >
                       <img src={imageUrl} alt="" onError={() => markImageFailed(imageUrl)} />
@@ -144,6 +221,23 @@ const ProductDetails = () => {
             <PackageCheck size={18} />
             <span>{product.stockQuantity > 0 ? `متوفر: ${product.stockQuantity}` : 'غير متوفر حاليا'}</span>
           </div>
+          {product.isClothing ? (
+            <div className="product-size-box">
+              <strong>اختر المقاس</strong>
+              <div className="product-size-options">
+                {availableSizes.map((size) => (
+                  <button
+                    className={selectedSize === size ? 'active' : ''}
+                    type="button"
+                    key={size}
+                    onClick={() => setSelectedSize(size)}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="product-actions">
             <button className="primary-button" type="button" onClick={addToCart} disabled={product.stockQuantity <= 0}>
               <ShoppingCart size={18} />
@@ -163,6 +257,50 @@ const ProductDetails = () => {
           <span>إضافة للسلة</span>
         </button>
       </div>
+
+      {lightboxImage ? (
+        <div className="product-lightbox" role="dialog" aria-modal="true">
+          <button className="product-lightbox-close" type="button" onClick={closeLightbox} aria-label="إغلاق">
+            <X size={20} />
+          </button>
+          {gallery.length > 1 ? (
+            <>
+              <button className="product-lightbox-nav prev" type="button" onClick={() => moveLightbox(-1)} aria-label="الصورة السابقة">
+                <ChevronRight size={24} />
+              </button>
+              <button className="product-lightbox-nav next" type="button" onClick={() => moveLightbox(1)} aria-label="الصورة التالية">
+                <ChevronLeft size={24} />
+              </button>
+            </>
+          ) : null}
+          <div
+            className="product-lightbox-stage"
+            onTouchStart={handleLightboxTouchStart}
+            onTouchMove={handleLightboxTouchMove}
+            onTouchEnd={handleLightboxTouchEnd}
+          >
+            <img
+              src={lightboxImage}
+              alt={product.title}
+              style={{ transform: `scale(${lightboxZoom})` }}
+              onClick={() => setLightboxZoom((current) => (current > 1 ? 1 : 2))}
+              onError={() => {
+                markImageFailed(lightboxImage);
+                closeLightbox();
+              }}
+            />
+          </div>
+          <div className="product-lightbox-controls">
+            <button type="button" onClick={() => setLightboxZoom((current) => Math.max(1, current - 0.35))}>
+              <ZoomOut size={17} />
+            </button>
+            <span>{(lightboxIndex ?? 0) + 1} / {gallery.length}</span>
+            <button type="button" onClick={() => setLightboxZoom((current) => Math.min(3, current + 0.35))}>
+              <ZoomIn size={17} />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {related.length ? (
         <section className="panel related-products">

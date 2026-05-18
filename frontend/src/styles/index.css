@@ -44,7 +44,8 @@ body {
 body,
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -60,7 +61,8 @@ a {
 
 button,
 input,
-textarea {
+textarea,
+select {
   border: 0;
 }
 
@@ -74,7 +76,8 @@ button:disabled {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   min-width: 0;
   color: var(--text);
@@ -87,7 +90,8 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: rgba(62, 226, 197, 0.65);
   box-shadow: 0 0 0 4px rgba(62, 226, 197, 0.12);
   background: rgba(255, 255, 255, 0.1);
@@ -96,6 +100,10 @@ textarea:focus {
 input::placeholder,
 textarea::placeholder {
   color: var(--muted-2);
+}
+
+select {
+  appearance: none;
 }
 
 .suspension-page {
@@ -4511,7 +4519,7 @@ th {
 
   .main-content {
     padding: 1rem;
-    padding-bottom: 6rem;
+    padding-bottom: 4.75rem;
   }
 
   .topbar {
@@ -4535,37 +4543,48 @@ th {
 
   .mobile-nav {
     position: fixed;
-    right: 0.7rem;
-    bottom: 0.7rem;
-    left: 0.7rem;
+    right: 0.55rem;
+    bottom: 0.48rem;
+    left: 0.55rem;
     z-index: 50;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
-    gap: 0.25rem;
-    padding: 0.38rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: rgba(8, 11, 16, 0.9);
-    box-shadow: var(--shadow);
+    grid-template-columns: repeat(auto-fit, minmax(46px, 1fr));
+    gap: 0.18rem;
+    padding: 0.26rem;
+    border: 1px solid rgba(255, 255, 255, 0.105);
+    border-radius: 16px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.026)),
+      rgba(7, 10, 16, 0.92);
+    box-shadow: 0 16px 46px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(18px);
   }
 
   .mobile-nav a {
     min-width: 0;
-    min-height: 48px;
+    min-height: 40px;
     flex-direction: column;
     justify-content: center;
-    gap: 0.2rem;
-    font-size: 0.68rem;
+    gap: 0.14rem;
+    padding: 0.2rem 0.12rem;
+    border-radius: 12px;
+    font-size: 0.61rem;
   }
 
   .mobile-nav button {
     min-width: 0;
-    min-height: 48px;
+    min-height: 40px;
     flex-direction: column;
     justify-content: center;
-    gap: 0.2rem;
-    font-size: 0.68rem;
+    gap: 0.14rem;
+    padding: 0.2rem 0.12rem;
+    border-radius: 12px;
+    font-size: 0.61rem;
+  }
+
+  .mobile-nav svg {
+    width: 17px;
+    height: 17px;
   }
 
   .mobile-nav span {
@@ -4599,7 +4618,7 @@ th {
 
   .main-content {
     padding: 0.62rem;
-    padding-bottom: 5.25rem;
+    padding-bottom: 4.35rem;
   }
 
   .topbar {
@@ -4660,7 +4679,8 @@ th {
   }
 
   input,
-  textarea {
+  textarea,
+  select {
     padding: 0.68rem 0.76rem;
   }
 
@@ -4913,14 +4933,15 @@ th {
   }
 
   .mobile-nav {
-    right: 0.45rem;
-    bottom: 0.45rem;
-    left: 0.45rem;
+    right: 0.38rem;
+    bottom: 0.36rem;
+    left: 0.38rem;
   }
 
   .mobile-nav a,
   .mobile-nav button {
-    font-size: 0.68rem;
+    min-height: 38px;
+    font-size: 0.58rem;
   }
 }
 
@@ -6503,6 +6524,19 @@ body:has(.games-page) {
   font-weight: 900;
 }
 
+.cart-item-size {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.24rem;
+  padding: 0.18rem 0.45rem;
+  color: var(--cyan);
+  background: rgba(62, 226, 197, 0.09);
+  border: 1px solid rgba(62, 226, 197, 0.18);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
 .cart-summary-card {
   display: grid;
   gap: 0.55rem;
@@ -6575,6 +6609,7 @@ body:has(.games-page) {
   content: '';
   position: absolute;
   inset: 0;
+  pointer-events: none;
   opacity: 0.55;
   background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.1) 44%, transparent 72%);
   transform: translateX(120%);
@@ -6583,6 +6618,16 @@ body:has(.games-page) {
 
 .product-main-image-wrap.loaded::before {
   display: none;
+}
+
+.product-main-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  cursor: zoom-in;
 }
 
 .product-main-image {
@@ -6751,6 +6796,56 @@ body:has(.games-page) {
   font-weight: 800;
 }
 
+.product-size-box,
+.product-size-admin-box {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.65rem;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+}
+
+.product-size-box strong,
+.product-size-admin-box strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.product-size-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
+.product-size-options button,
+.custom-size-row button {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 0.35rem 0.62rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font-weight: 900;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.product-size-options button.active,
+.product-size-options button:hover,
+.custom-size-row button:hover {
+  color: #06100d;
+  background: linear-gradient(135deg, var(--cyan), #d8fff7);
+  border-color: rgba(62, 226, 197, 0.55);
+  transform: translateY(-1px);
+}
+
+.custom-size-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
 .product-actions {
   display: none;
   gap: 0.6rem;
@@ -6763,7 +6858,7 @@ body:has(.games-page) {
 .product-mobile-cart {
   position: sticky;
   right: 0;
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(58px + env(safe-area-inset-bottom));
   left: 0;
   z-index: 40;
   display: grid;
@@ -6801,6 +6896,111 @@ body:has(.games-page) {
 .product-mobile-cart .primary-button {
   min-height: 44px;
   padding-inline: 0.6rem;
+}
+
+.product-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: grid;
+  place-items: center;
+  padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 50% 10%, rgba(62, 226, 197, 0.14), transparent 20rem),
+    rgba(2, 5, 10, 0.94);
+  backdrop-filter: blur(18px);
+  animation: fadeIn 180ms ease both;
+}
+
+.product-lightbox-stage {
+  width: 100%;
+  height: min(78vh, 760px);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.product-lightbox-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.44);
+  transition: transform 160ms ease;
+  cursor: zoom-in;
+  user-select: none;
+}
+
+.product-lightbox-close,
+.product-lightbox-nav,
+.product-lightbox-controls button {
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  background: rgba(13, 18, 27, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+}
+
+.product-lightbox-close {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: 0.75rem;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+}
+
+.product-lightbox-nav {
+  position: fixed;
+  top: 50%;
+  z-index: 2;
+  width: 42px;
+  height: 54px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+}
+
+.product-lightbox-nav.prev {
+  right: 0.72rem;
+}
+
+.product-lightbox-nav.next {
+  left: 0.72rem;
+}
+
+.product-lightbox-controls {
+  position: fixed;
+  right: 50%;
+  bottom: max(0.85rem, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.36rem;
+  color: var(--muted);
+  background: rgba(10, 15, 23, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.34);
+  transform: translateX(50%);
+  backdrop-filter: blur(12px);
+}
+
+.product-lightbox-controls button {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+}
+
+.product-lightbox-controls span {
+  min-width: 56px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 @keyframes shimmerSweep {
@@ -7286,7 +7486,8 @@ body:has(.games-page) {
 }
 
 .admin-store-edit-grid input,
-.admin-store-edit-grid textarea {
+.admin-store-edit-grid textarea,
+.admin-store-edit-grid select {
   min-height: 42px;
   padding: 0.58rem 0.65rem;
   font-size: 0.82rem;
@@ -7595,7 +7796,7 @@ body:has(.games-page) {
   }
 
   .product-mobile-cart {
-    bottom: calc(74px + env(safe-area-inset-bottom));
+    bottom: calc(58px + env(safe-area-inset-bottom));
     padding: 0.52rem;
   }
 

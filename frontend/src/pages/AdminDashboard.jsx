@@ -42,6 +42,8 @@ const tabs = [
   { id: 'withdrawals', label: 'السحب', icon: WalletCards },
 ];
 
+const defaultSizeOptions = ['S', 'M', 'L', 'XL', 'XXL'];
+
 const calculateOriginalPrice = (finalPrice, discountPercent) => {
   const finalValue = Number(finalPrice);
   const discountValue = Math.max(0, Math.min(90, Number(discountPercent) || 0));
@@ -88,6 +90,8 @@ const AdminDashboard = () => {
     discountPercent: 30,
     finalPrice: '',
     stockQuantity: 10,
+    isClothing: false,
+    sizes: defaultSizeOptions,
     rating: '',
     promoBadge: '',
     sourceUrl: '',
@@ -101,6 +105,7 @@ const AdminDashboard = () => {
     active: true,
   });
   const [imageUrlFields, setImageUrlFields] = useState(['']);
+  const [customSizeInput, setCustomSizeInput] = useState('');
   const [storeEdits, setStoreEdits] = useState({});
   const [storeEditImages, setStoreEditImages] = useState({});
   const [assetForm, setAssetForm] = useState({
@@ -291,7 +296,7 @@ const AdminDashboard = () => {
 
   const appendStoreFields = (formData, payload) => {
     Object.entries(payload).forEach(([key, value]) => {
-      formData.append(key, value ?? '');
+      formData.append(key, Array.isArray(value) ? JSON.stringify(value) : value ?? '');
     });
   };
 
@@ -310,6 +315,35 @@ const AdminDashboard = () => {
     });
   };
 
+  const setStoreClothing = (isClothing) => {
+    setStoreForm((current) => ({
+      ...current,
+      isClothing,
+      sizes: isClothing && (!current.sizes || !current.sizes.length) ? defaultSizeOptions : current.sizes,
+    }));
+  };
+
+  const toggleStoreSize = (size) => {
+    setStoreForm((current) => {
+      const sizes = current.sizes || [];
+      const exists = sizes.includes(size);
+      return {
+        ...current,
+        sizes: exists ? sizes.filter((item) => item !== size) : [...sizes, size],
+      };
+    });
+  };
+
+  const addCustomStoreSize = () => {
+    const size = customSizeInput.trim();
+    if (!size) return;
+    setStoreForm((current) => ({
+      ...current,
+      sizes: [...new Set([...(current.sizes || []), size])],
+    }));
+    setCustomSizeInput('');
+  };
+
   const createStoreProduct = async (event) => {
     event.preventDefault();
     try {
@@ -320,6 +354,7 @@ const AdminDashboard = () => {
         originalPrice: calculatedOriginalPrice || storeForm.finalPrice,
         promoBadge: storeForm.promoBadge || `خصم ${storeForm.discountPercent || 0}%`,
         sourceProvider: 'manual',
+        sizes: storeForm.isClothing ? storeForm.sizes : [],
       };
       appendStoreFields(formData, productPayload);
       if (imageUrls.length) {
@@ -340,6 +375,8 @@ const AdminDashboard = () => {
         discountPercent: 30,
         finalPrice: '',
         stockQuantity: 10,
+        isClothing: false,
+        sizes: defaultSizeOptions,
         rating: '',
         promoBadge: '',
         sourceUrl: '',
@@ -353,6 +390,7 @@ const AdminDashboard = () => {
         active: true,
       });
       setImageUrlFields(['']);
+      setCustomSizeInput('');
       event.target.reset();
       showToast(data.message, 'success');
     } catch (error) {
@@ -865,6 +903,51 @@ const AdminDashboard = () => {
                   />
                 </label>
               </div>
+              <label>
+                <span>هل هذا المنتج لباس؟</span>
+                <select value={storeForm.isClothing ? 'yes' : 'no'} onChange={(event) => setStoreClothing(event.target.value === 'yes')}>
+                  <option value="no">لا</option>
+                  <option value="yes">نعم</option>
+                </select>
+              </label>
+              {storeForm.isClothing ? (
+                <div className="product-size-admin-box">
+                  <strong>المقاسات المتوفرة</strong>
+                  <div className="product-size-options admin-size-options">
+                    {defaultSizeOptions.map((size) => (
+                      <button
+                        className={(storeForm.sizes || []).includes(size) ? 'active' : ''}
+                        type="button"
+                        key={size}
+                        onClick={() => toggleStoreSize(size)}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="manual-image-url-row">
+                    <input
+                      value={customSizeInput}
+                      onChange={(event) => setCustomSizeInput(event.target.value)}
+                      placeholder="مقاس مخصص"
+                    />
+                    <button className="ghost-button table-button" type="button" onClick={addCustomStoreSize}>
+                      إضافة
+                    </button>
+                  </div>
+                  {(storeForm.sizes || []).filter((size) => !defaultSizeOptions.includes(size)).length ? (
+                    <div className="custom-size-row">
+                      {(storeForm.sizes || [])
+                        .filter((size) => !defaultSizeOptions.includes(size))
+                        .map((size) => (
+                          <button type="button" key={size} onClick={() => toggleStoreSize(size)}>
+                            {size} ×
+                          </button>
+                        ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <button className="primary-button" type="submit">
                 <ImagePlus size={18} />
                 <span>إضافة المنتج</span>
@@ -921,6 +1004,18 @@ const AdminDashboard = () => {
                           type="number"
                           defaultValue={item.stockQuantity}
                           onChange={(event) => setStoreEdit(item.id, 'stockQuantity', event.target.value)}
+                        />
+                        <select
+                          defaultValue={item.isClothing ? 'yes' : 'no'}
+                          onChange={(event) => setStoreEdit(item.id, 'isClothing', event.target.value === 'yes')}
+                        >
+                          <option value="no">ليس لباسا</option>
+                          <option value="yes">لباس</option>
+                        </select>
+                        <input
+                          defaultValue={(item.sizes || []).join(', ')}
+                          onChange={(event) => setStoreEdit(item.id, 'sizes', event.target.value)}
+                          placeholder="المقاسات: S, M, L"
                         />
                         <textarea
                           rows="2"

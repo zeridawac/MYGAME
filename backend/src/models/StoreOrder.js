@@ -25,6 +25,11 @@ const storeOrderItemSchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
+    size: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     totalPrice: {
       type: Number,
       required: true,

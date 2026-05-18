@@ -79,12 +79,12 @@ const AppLayout = () => {
       <nav className="mobile-nav" aria-label="التنقل السفلي">
         {navItems.map((item) => (
           <NavLink to={item.to} key={item.to}>
-            <item.icon size={20} />
+            <item.icon size={17} />
             <span>{item.label}</span>
           </NavLink>
         ))}
         <button type="button" onClick={handleLogout}>
-          <LogOut size={20} />
+          <LogOut size={17} />
           <span>خروج</span>
         </button>
       </nav>

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 const CartContext = createContext(null);
 const CART_KEY = 'reda_store_cart';
+const cartItemKey = (productId, size = '') => `${productId}::${String(size || '').trim() || 'default'}`;
 
 const readStoredCart = () => {
   try {
@@ -20,16 +21,19 @@ export const CartProvider = ({ children }) => {
   }, []);
 
   const addItem = useCallback(
-    (product, quantity = 1) => {
+    (product, quantity = 1, options = {}) => {
       const productId = product.id || product._id;
+      const size = String(options.size || '').trim();
+      const itemKey = cartItemKey(productId, size);
       const nextQuantity = Math.max(1, Number(quantity || 1));
       const nextItems = [...items];
-      const existing = nextItems.find((item) => item.productId === productId);
+      const existing = nextItems.find((item) => (item.cartKey || cartItemKey(item.productId, item.size)) === itemKey);
 
       if (existing) {
         existing.quantity += nextQuantity;
       } else {
         nextItems.push({
+          cartKey: itemKey,
           productId,
           title: product.title,
           imageUrl: product.images?.[0]?.url || '',
@@ -37,6 +41,8 @@ export const CartProvider = ({ children }) => {
           originalPrice: product.originalPrice,
           discountPercent: product.discountPercent,
           stockQuantity: product.stockQuantity,
+          isClothing: Boolean(product.isClothing),
+          size,
           quantity: nextQuantity,
         });
       }
@@ -47,16 +53,20 @@ export const CartProvider = ({ children }) => {
   );
 
   const updateQuantity = useCallback(
-    (productId, quantity) => {
+    (itemKey, quantity) => {
       const safeQuantity = Math.max(1, Number(quantity || 1));
-      persist(items.map((item) => (item.productId === productId ? { ...item, quantity: safeQuantity } : item)));
+      persist(
+        items.map((item) =>
+          (item.cartKey || cartItemKey(item.productId, item.size)) === itemKey ? { ...item, quantity: safeQuantity } : item
+        )
+      );
     },
     [items, persist]
   );
 
   const removeItem = useCallback(
-    (productId) => {
-      persist(items.filter((item) => item.productId !== productId));
+    (itemKey) => {
+      persist(items.filter((item) => (item.cartKey || cartItemKey(item.productId, item.size)) !== itemKey));
     },
     [items, persist]
   );

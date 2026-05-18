@@ -53,6 +53,14 @@ const storeProductSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    isClothing: {
+      type: Boolean,
+      default: false,
+    },
+    sizes: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
     rating: {
       type: Number,
       default: null,
