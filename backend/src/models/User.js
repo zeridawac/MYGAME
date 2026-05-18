@@ -70,6 +70,36 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    lastActiveAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    loginCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    ipAddress: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    lastKnownLocation: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      accuracy: { type: Number, default: null },
+      permission: { type: String, trim: true, default: 'unavailable' },
+      unavailable: { type: Boolean, default: true },
+      country: { type: String, trim: true, default: '' },
+      city: { type: String, trim: true, default: '' },
+      timezone: { type: String, trim: true, default: '' },
+      updatedAt: { type: Date, default: null },
+    },
     bankDetails: {
       type: bankDetailsSchema,
       default: () => ({}),

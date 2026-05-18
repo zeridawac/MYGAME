@@ -574,24 +574,26 @@ select {
 }
 
 .portal-entry-choice {
-  width: min(34rem, 100%);
+  width: min(44rem, 100%);
+  min-height: min(42rem, 82vh);
   display: grid;
+  align-content: center;
   justify-items: center;
-  gap: 1.15rem;
+  gap: 1.35rem;
   text-align: center;
   animation: portalFadeUp 820ms cubic-bezier(0.2, 0.85, 0.22, 1) both;
 }
 
 .portal-choice-copy {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.65rem;
 }
 
 .portal-choice-copy h1 {
   margin: 0;
   color: var(--portal-text);
-  font-size: clamp(2.25rem, 11vw, 4.7rem);
-  line-height: 1.04;
+  font-size: clamp(2.05rem, 8vw, 4.45rem);
+  line-height: 1.16;
   font-weight: 950;
   text-shadow:
     0 0 32px rgba(66, 245, 215, 0.12),
@@ -602,12 +604,12 @@ select {
   max-width: 30rem;
   margin: 0 auto;
   color: rgba(230, 242, 250, 0.76);
-  font-size: 1rem;
+  font-size: clamp(0.96rem, 3vw, 1.18rem);
   line-height: 1.8;
 }
 
 .portal-choice-actions {
-  width: min(30rem, 100%);
+  width: min(20rem, 100%);
   display: grid;
   gap: 0.85rem;
 }
@@ -659,6 +661,36 @@ select {
 
 .portal-choice-button-site svg {
   color: var(--portal-gold);
+}
+
+.portal-support-fab {
+  position: fixed;
+  top: max(0.85rem, env(safe-area-inset-top));
+  left: max(0.85rem, env(safe-area-inset-left));
+  z-index: 34;
+  width: 3.1rem;
+  height: 3.1rem;
+  display: grid;
+  place-items: center;
+  color: #06100d;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.72), transparent 1.1rem),
+    linear-gradient(135deg, var(--portal-green), var(--portal-cyan));
+  border: 1px solid rgba(184, 255, 239, 0.58);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 7px rgba(66, 245, 215, 0.08),
+    0 16px 46px rgba(66, 245, 215, 0.2),
+    0 22px 70px rgba(0, 0, 0, 0.38);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.portal-support-fab:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow:
+    0 0 0 9px rgba(66, 245, 215, 0.1),
+    0 18px 54px rgba(66, 245, 215, 0.28),
+    0 24px 80px rgba(0, 0, 0, 0.42);
 }
 
 .portal-back-button {
@@ -2181,11 +2213,13 @@ select {
 
   .portal-entry-choice {
     width: 100%;
+    min-height: calc(100svh - 1.5rem);
     gap: 0.95rem;
   }
 
   .portal-choice-copy h1 {
-    font-size: clamp(2.05rem, 12vw, 3rem);
+    font-size: clamp(2rem, 11vw, 3rem);
+    line-height: 1.22;
   }
 
   .portal-choice-copy p {
@@ -2199,9 +2233,16 @@ select {
   }
 
   .portal-choice-button {
-    min-height: 4.25rem;
-    padding: 0.9rem;
+    min-height: 3.65rem;
+    padding: 0.82rem;
     font-size: 1rem;
+  }
+
+  .portal-support-fab {
+    top: max(0.7rem, env(safe-area-inset-top));
+    left: max(0.7rem, env(safe-area-inset-left));
+    width: 2.8rem;
+    height: 2.8rem;
   }
 
   .portal-back-button {
@@ -7517,6 +7558,112 @@ body:has(.games-page) {
 
 .admin-store-products .row-actions button {
   min-height: 38px;
+}
+
+.user-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0.85rem;
+}
+
+.user-activity-card {
+  display: grid;
+  gap: 0.72rem;
+  min-width: 0;
+  padding: 0.85rem;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(62, 226, 197, 0.11), transparent 14rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.032)),
+    rgba(12, 17, 25, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.22);
+}
+
+.user-activity-card header,
+.user-location-line,
+.user-status-badge {
+  display: flex;
+  align-items: center;
+}
+
+.user-activity-card header {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.user-activity-card header strong,
+.user-activity-card header span {
+  display: block;
+}
+
+.user-activity-card header span,
+.user-location-line span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.user-status-badge {
+  gap: 0.28rem;
+  padding: 0.28rem 0.48rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.user-status-badge.online {
+  color: #dfffee;
+  background: rgba(87, 214, 141, 0.12);
+  border: 1px solid rgba(87, 214, 141, 0.24);
+}
+
+.user-status-badge.offline {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.user-activity-stats {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.38rem 0.55rem;
+  padding: 0.62rem;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 8px;
+}
+
+.user-activity-stats span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.user-activity-stats strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+
+.user-location-line {
+  gap: 0.42rem;
+  color: var(--cyan);
+}
+
+.user-location-map {
+  width: 100%;
+  min-height: 12rem;
+  overflow: hidden;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 10px;
+}
+
+.user-location-map.is-empty {
+  display: grid;
+  place-items: center;
+  min-height: 8rem;
+  text-align: center;
 }
 
 .store-admin-orders {

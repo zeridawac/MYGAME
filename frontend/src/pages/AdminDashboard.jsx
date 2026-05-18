@@ -7,6 +7,7 @@ import {
   Gift,
   ImagePlus,
   Megaphone,
+  MapPin,
   PackageCheck,
   Settings,
   ShoppingBag,
@@ -15,6 +16,8 @@ import {
   Trash2,
   UsersRound,
   WalletCards,
+  Wifi,
+  WifiOff,
   XCircle,
 } from 'lucide-react';
 import api from '../api/config.js';
@@ -38,6 +41,7 @@ const tabs = [
   { id: 'coupons', label: 'الهدايا', icon: Gift },
   { id: 'store', label: 'المتجر', icon: ShoppingBag },
   { id: 'settings', label: 'القيمة', icon: Settings },
+  { id: 'userActivity', label: 'نشاط المستخدمين', icon: MapPin },
   { id: 'activity', label: 'النشاط', icon: Activity },
   { id: 'withdrawals', label: 'السحب', icon: WalletCards },
 ];
@@ -50,6 +54,31 @@ const calculateOriginalPrice = (finalPrice, discountPercent) => {
   if (!Number.isFinite(finalValue) || finalValue <= 0) return '';
   if (!discountValue) return Math.round(finalValue);
   return Math.round(finalValue / (1 - discountValue / 100));
+};
+
+const formatActivityDateTime = (value) => {
+  if (!value) return 'غير متاح';
+  return new Date(value).toLocaleString('ar-MA', {
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    day: 'numeric',
+    month: 'short',
+  });
+};
+
+const locationLabel = (location) => {
+  if (!location || location.unavailable) return 'الموقع غير متاح';
+  return [location.city, location.country].filter(Boolean).join('، ') || 'موقع تقريبي محفوظ';
+};
+
+const mapUrlForLocation = (location) => {
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return '';
+  const delta = 0.01;
+  const bbox = [longitude - delta, latitude - delta, longitude + delta, latitude + delta].join(',');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitude},${longitude}`;
 };
 
 const AdminDashboard = () => {
@@ -72,6 +101,7 @@ const AdminDashboard = () => {
     targetPath: '/store',
   });
   const [activity, setActivity] = useState([]);
+  const [userActivity, setUserActivity] = useState([]);
   const [inviteForm, setInviteForm] = useState({ code: '' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', body: '' });
   const [couponForm, setCouponForm] = useState({
@@ -147,6 +177,7 @@ const AdminDashboard = () => {
         storeProductsRes,
         storeOrdersRes,
         popupRes,
+        userActivityRes,
         activityRes,
       ] = await Promise.all([
         api.get('/admin/users'),
@@ -158,6 +189,7 @@ const AdminDashboard = () => {
         api.get('/admin/store/products'),
         api.get('/admin/store/orders'),
         api.get('/admin/settings/store-popup'),
+        api.get('/admin/user-activity'),
         api.get('/admin/activity'),
       ]);
 
@@ -170,6 +202,7 @@ const AdminDashboard = () => {
       setStoreProducts(storeProductsRes.data.products);
       setStoreOrders(storeOrdersRes.data.orders);
       setPopupForm(popupRes.data.storePopup);
+      setUserActivity(userActivityRes.data.users || []);
       setActivity(activityRes.data.activity);
     } catch (error) {
       showToast(error.message, 'error');
@@ -1139,6 +1172,58 @@ const AdminDashboard = () => {
               </button>
             </form>
           </div>
+        ) : null}
+
+        {activeTab === 'userActivity' ? (
+          userActivity.length ? (
+            <div className="user-activity-grid">
+              {userActivity.map((item) => {
+                const location = item.lastKnownLocation || {};
+                const mapUrl = mapUrlForLocation(location);
+                const isOnline = item.status === 'online';
+                return (
+                  <article className="user-activity-card" key={item.id || item._id}>
+                    <header>
+                      <div>
+                        <strong>{item.username}</strong>
+                        <span>{item.isAdmin ? 'أدمن' : 'مستخدم'}</span>
+                      </div>
+                      <b className={`user-status-badge ${isOnline ? 'online' : 'offline'}`}>
+                        {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+                        {isOnline ? 'online' : 'offline'}
+                      </b>
+                    </header>
+                    <div className="user-activity-stats">
+                      <span>عدد الدخول</span>
+                      <strong>{item.loginCount || 0}</strong>
+                      <span>آخر دخول</span>
+                      <strong>{formatActivityDateTime(item.lastLoginAt)}</strong>
+                      <span>آخر نشاط</span>
+                      <strong>{formatActivityDateTime(item.lastActiveAt)}</strong>
+                      <span>IP</span>
+                      <strong>{item.ipAddress || 'غير متاح'}</strong>
+                    </div>
+                    <div className="user-location-line">
+                      <MapPin size={16} />
+                      <span>{locationLabel(location)}</span>
+                    </div>
+                    {mapUrl ? (
+                      <iframe
+                        className="user-location-map"
+                        title={`خريطة ${item.username}`}
+                        src={mapUrl}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="user-location-map is-empty">لا توجد إحداثيات محفوظة</div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState title="لا يوجد نشاط مستخدمين" text="سيظهر آخر دخول وموقع المستخدمين هنا بعد تسجيل الدخول." />
+          )
         ) : null}
 
         {activeTab === 'activity' ? (

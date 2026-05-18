@@ -29,6 +29,31 @@ const listUsers = asyncHandler(async (req, res) => {
   });
 });
 
+const listUserActivity = asyncHandler(async (req, res) => {
+  const onlineCutoff = Date.now() - 3 * 60 * 1000;
+  const users = await User.find()
+    .select('username isAdmin loginCount lastLoginAt lastLoginDate lastActiveAt ipAddress lastKnownLocation createdAt')
+    .sort({ lastActiveAt: -1, lastLoginAt: -1, createdAt: -1 });
+
+  res.json({
+    success: true,
+    users: users.map((user) => ({
+      id: user._id,
+      _id: user._id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      loginCount: user.loginCount || 0,
+      lastLoginAt: user.lastLoginAt || user.lastLoginDate,
+      lastLoginDate: user.lastLoginDate,
+      lastActiveAt: user.lastActiveAt,
+      status: user.lastActiveAt && new Date(user.lastActiveAt).getTime() >= onlineCutoff ? 'online' : 'offline',
+      ipAddress: user.ipAddress || '',
+      lastKnownLocation: user.lastKnownLocation || null,
+      createdAt: user.createdAt,
+    })),
+  });
+});
+
 const updateUserStats = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) {
@@ -526,6 +551,7 @@ const listActivity = asyncHandler(async (req, res) => {
 
 module.exports = {
   listUsers,
+  listUserActivity,
   updateUserStats,
   createInviteCode,
   listInviteCodes,

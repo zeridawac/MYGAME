@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('../utils/asyncHandler');
+const { getRequestIp } = require('../utils/requestMeta');
 const User = require('../models/User');
 
 const protect = asyncHandler(async (req, res, next) => {
@@ -20,6 +21,13 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 
   req.user = user;
+  const now = new Date();
+  const lastActiveAt = user.lastActiveAt ? new Date(user.lastActiveAt).getTime() : 0;
+  if (!lastActiveAt || now.getTime() - lastActiveAt > 60 * 1000) {
+    user.lastActiveAt = now;
+    user.ipAddress = getRequestIp(req);
+    await user.save();
+  }
   next();
 });
 

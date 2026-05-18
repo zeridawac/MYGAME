@@ -1,6 +1,7 @@
 const express = require('express');
 const {
   listUsers,
+  listUserActivity,
   updateUserStats,
   createInviteCode,
   listInviteCodes,
@@ -68,6 +69,7 @@ router.delete('/uploads/portal-chat', portalUploadAdminOnly, deleteAllPortalChat
 router.use(protect, adminOnly);
 
 router.get('/users', listUsers);
+router.get('/user-activity', listUserActivity);
 router.patch('/users/:id', updateUserStats);
 
 router.get('/invite-codes', listInviteCodes);

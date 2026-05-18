@@ -3,6 +3,20 @@ import api from '../api/config.js';
 
 const AuthContext = createContext(null);
 const TOKEN_KEY = 'reda_token';
+const PENDING_LOCATION_KEY = 'reda_pending_location';
+
+const readPendingLocation = () => {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_LOCATION_KEY) || 'null');
+  } catch {
+    return null;
+  }
+};
+
+const withPendingLocation = (payload) => {
+  const location = readPendingLocation();
+  return location ? { ...payload, location } : payload;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -40,14 +54,16 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = useCallback(async (credentials) => {
-    const { data } = await api.post('/auth/login', credentials);
+    const { data } = await api.post('/auth/login', withPendingLocation(credentials));
     persistSession(data);
+    localStorage.removeItem(PENDING_LOCATION_KEY);
     return data.user;
   }, [persistSession]);
 
   const register = useCallback(async (payload) => {
-    const { data } = await api.post('/auth/register', payload);
+    const { data } = await api.post('/auth/register', withPendingLocation(payload));
     persistSession(data);
+    localStorage.removeItem(PENDING_LOCATION_KEY);
     return data.user;
   }, [persistSession]);
 

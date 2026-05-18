@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const generateToken = require('../utils/generateToken');
 const presentUser = require('../utils/userPresenter');
 const { isSameUtcDay, isYesterdayUtc } = require('../utils/dateUtils');
+const { getRequestIp, normalizeLocationPayload } = require('../utils/requestMeta');
 const User = require('../models/User');
 const InviteCode = require('../models/InviteCode');
 
@@ -40,6 +41,11 @@ const register = asyncHandler(async (req, res) => {
     password,
     streak: 1,
     lastLoginDate: new Date(),
+    lastLoginAt: new Date(),
+    lastActiveAt: new Date(),
+    loginCount: 1,
+    ipAddress: getRequestIp(req),
+    lastKnownLocation: normalizeLocationPayload(req.body.location),
   });
 
   inviteCode.used = true;
@@ -72,8 +78,16 @@ const login = asyncHandler(async (req, res) => {
   if (!isSameUtcDay(user.lastLoginDate, now)) {
     user.streak = isYesterdayUtc(user.lastLoginDate, now) ? user.streak + 1 : 1;
     user.lastLoginDate = now;
-    await user.save();
   }
+
+  user.lastLoginAt = now;
+  user.lastActiveAt = now;
+  user.loginCount = Number(user.loginCount || 0) + 1;
+  user.ipAddress = getRequestIp(req);
+  if (req.body.location) {
+    user.lastKnownLocation = normalizeLocationPayload(req.body.location);
+  }
+  await user.save();
 
   res.json({
     success: true,

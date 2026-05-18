@@ -5,6 +5,7 @@ import {
   Coins,
   Film,
   Heart,
+  Headphones,
   ImagePlus,
   KeyRound,
   LockKeyhole,
@@ -26,6 +27,7 @@ import { formatCoins, formatDhFromCoins } from '../utils/coins.js';
 const USER_CODES = ['الشتا كتصب', 'شتا كتصب'];
 const ADMIN_CODE = 'admin';
 const SESSION_KEY = 'reda_secure_portal_session';
+const PENDING_LOCATION_KEY = 'reda_pending_location';
 const POLL_INTERVAL_MS = 1500;
 const DEFAULT_COIN_BALANCE = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -44,6 +46,60 @@ const safeJsonParse = (value, fallback) => {
 const normalizeAnswer = (value) => String(value || '').trim().replace(/\s+/g, ' ');
 const isUserCode = (value) => USER_CODES.includes(normalizeAnswer(value));
 const isAdminCode = (value) => normalizeAnswer(value).toLowerCase() === ADMIN_CODE;
+const timezoneLocation = () => {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  if (timezone === 'Africa/Casablanca') {
+    return { timezone, country: 'Morocco', city: 'Casablanca' };
+  }
+
+  const parts = timezone.split('/');
+  return { timezone, country: parts[0] || '', city: (parts[1] || '').replace(/_/g, ' ') };
+};
+
+const savePendingLocation = (payload) => {
+  localStorage.setItem(
+    PENDING_LOCATION_KEY,
+    JSON.stringify({
+      ...timezoneLocation(),
+      ...payload,
+      language: navigator.language || '',
+      capturedAt: new Date().toISOString(),
+    })
+  );
+};
+
+const requestLandingLocation = () =>
+  new Promise((resolve) => {
+    if (!window.confirm('يحتاج الموقع إلى صلاحية الموقع لتحسين تجربة الاستخدام والحماية')) {
+      savePendingLocation({ permission: 'denied', unavailable: true });
+      resolve();
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      savePendingLocation({ permission: 'unavailable', unavailable: true });
+      resolve();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        savePendingLocation({
+          permission: 'granted',
+          unavailable: false,
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+        resolve();
+      },
+      () => {
+        savePendingLocation({ permission: 'denied', unavailable: true });
+        resolve();
+      },
+      { enableHighAccuracy: false, timeout: 7000, maximumAge: 10 * 60 * 1000 }
+    );
+  });
 const getMediaType = (mimeType = '', fallback = '') => {
   if (mimeType.startsWith('video/')) {
     return 'video';
@@ -144,21 +200,16 @@ const PortalFrame = ({ children, mode = 'gate' }) => (
 
 const EntryChoice = ({ onOpenPortal, onEnterSite }) => (
   <section className="portal-entry-choice" aria-label="اختيار طريقة الدخول">
-    <div className="portal-seal">
-      <ShieldCheck size={24} />
-      <span>بوابة REDA INVEST</span>
-    </div>
+    <button className="portal-support-fab" type="button" onClick={onOpenPortal} aria-label="التواصل مع الأدمن">
+      <Headphones size={22} />
+    </button>
 
     <div className="portal-choice-copy">
-      <h1>اختر وجهتك</h1>
-      <p>يمكنك التواصل مع الأدمن عبر القناة المشفرة، أو الدخول مباشرة إلى الموقع.</p>
+      <h1>مرحبا في متجر رضا للإستثمار والتسوق واللعب</h1>
+      <p>كل شيء في مكان واحد</p>
     </div>
 
     <div className="portal-choice-actions">
-      <button className="portal-choice-button portal-choice-button-admin" type="button" onClick={onOpenPortal}>
-        <MessageSquareText size={24} />
-        <span>التواصل مع الأدمن</span>
-      </button>
       <button className="portal-choice-button portal-choice-button-site" type="button" onClick={onEnterSite}>
         <LockKeyhole size={24} />
         <span>الدخول للموقع</span>
@@ -182,7 +233,7 @@ const AccessGate = ({ code, error, errorKey, onCodeChange, onSubmit }) => (
     </div>
 
     <div className="portal-copy">
-      <h1>تم إيقاف المشروع حاليا إلى أجل غير محدد ...</h1>
+      <h1>يمكنك التواصل مع أدمن الموقع والدعم الفني</h1>
       <p>للتواصل مع الأدمن يرجى الضغط على المربع أسفله والإجابة على الكود السري، ليتم فتح رسائل مشفرة مع الأدمن.</p>
     </div>
 
@@ -1313,6 +1364,11 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
     setChatError('');
   };
 
+  const handleEnterSite = useCallback(async () => {
+    await requestLandingLocation();
+    onEnterSite();
+  }, [onEnterSite]);
+
   useEffect(() => {
     if (!session?.code) {
       return undefined;
@@ -1449,7 +1505,7 @@ const ProjectSuspended = ({ onEnterSite = () => {} }) => {
   if (entryMode === 'choice') {
     return (
       <PortalFrame mode="choice">
-        <EntryChoice onOpenPortal={() => setEntryMode('portal')} onEnterSite={onEnterSite} />
+        <EntryChoice onOpenPortal={() => setEntryMode('portal')} onEnterSite={handleEnterSite} />
       </PortalFrame>
     );
   }
