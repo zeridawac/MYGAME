@@ -42,6 +42,63 @@ const tabs = [
   { id: 'withdrawals', label: 'السحب', icon: WalletCards },
 ];
 
+const ImportDebugPanel = ({ debug }) => {
+  if (!debug) return null;
+
+  const current = debug.selected?.current;
+  const original = debug.selected?.original;
+  const detectedPrices = debug.detectedPrices || [];
+  const selectors = debug.selectorsTried || [];
+
+  return (
+    <div className={`store-import-debug ${debug.success ? 'success' : 'failed'}`}>
+      <div className="store-import-debug-head">
+        <strong>تشخيص الاستيراد</strong>
+        <span>{debug.success ? 'تم الاستخراج' : 'فشل الاستخراج'}</span>
+      </div>
+      <div className="store-import-debug-grid">
+        <article>
+          <span>السعر المستخرج</span>
+          <strong>{current ? `${current.dhPrice} DH` : 'غير موجود'}</strong>
+          <small>{debug.rawExtractedPrice || current?.rawText || '-'}</small>
+        </article>
+        <article>
+          <span>السعر الأصلي</span>
+          <strong>{original ? `${original.dhPrice} DH` : 'غير موجود'}</strong>
+          <small>{debug.rawExtractedOriginalPrice || original?.rawText || '-'}</small>
+        </article>
+        <article>
+          <span>مصدر التحليل</span>
+          <strong>{debug.parserSourceUsed || current?.source || '-'}</strong>
+          <small>{debug.failureReason || 'لا توجد أخطاء'}</small>
+        </article>
+      </div>
+
+      {detectedPrices.length ? (
+        <div className="store-debug-list">
+          <span>الأسعار المكتشفة</span>
+          {detectedPrices.slice(0, 8).map((price, index) => (
+            <code key={`${price.source}-${price.amount}-${index}`}>
+              {price.kind} • {price.amount} {price.currency} • {price.source}
+            </code>
+          ))}
+        </div>
+      ) : null}
+
+      {selectors.length ? (
+        <div className="store-debug-list">
+          <span>المحددات المجربة</span>
+          {selectors.slice(0, 6).map((selector, index) => (
+            <code key={`${selector.selector}-${index}`}>
+              {selector.selector}: {selector.matches || 0} / {selector.candidates || 0}
+            </code>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('users');
   const [loading, setLoading] = useState(true);
@@ -96,6 +153,7 @@ const AdminDashboard = () => {
   const [temuUrl, setTemuUrl] = useState('');
   const [temuImporting, setTemuImporting] = useState(false);
   const [importPreview, setImportPreview] = useState(null);
+  const [importDebug, setImportDebug] = useState(null);
   const [importedImages, setImportedImages] = useState([]);
   const [storeEdits, setStoreEdits] = useState({});
   const [storeEditImages, setStoreEditImages] = useState({});
@@ -290,6 +348,7 @@ const AdminDashboard = () => {
   const clearImportedProduct = () => {
     setTemuUrl('');
     setImportPreview(null);
+    setImportDebug(null);
     setImportedImages([]);
     setStoreForm((current) => ({
       ...current,
@@ -314,6 +373,7 @@ const AdminDashboard = () => {
       const { data } = await api.post('/admin/store/products/import-preview', { url: temuUrl.trim() });
       const product = data.product;
       setImportPreview(product);
+      setImportDebug(data.debug || product.importDebug || null);
       setImportedImages(product.images || []);
       setStoreForm((current) => ({
         ...current,
@@ -338,6 +398,9 @@ const AdminDashboard = () => {
       }));
       showToast(data.message || 'تم جلب معاينة المنتج', 'success');
     } catch (error) {
+      setImportPreview(null);
+      setImportedImages([]);
+      setImportDebug(error.response?.data?.debug || { success: false, failureReason: error.message });
       showToast(error.message || 'تعذر جلب بيانات المنتج', 'error');
     } finally {
       setTemuImporting(false);
@@ -877,6 +940,8 @@ const AdminDashboard = () => {
                     </article>
                   </div>
                 ) : null}
+
+                <ImportDebugPanel debug={importDebug} />
 
                 {importedImages.length ? (
                   <div className="store-import-gallery">

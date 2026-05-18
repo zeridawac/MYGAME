@@ -6822,6 +6822,104 @@ body:has(.games-page) {
   font-size: 0.86rem;
 }
 
+.store-import-debug {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 10px;
+}
+
+.store-import-debug.success {
+  border-color: rgba(62, 226, 197, 0.22);
+}
+
+.store-import-debug.failed {
+  border-color: rgba(255, 92, 112, 0.24);
+}
+
+.store-import-debug-head,
+.store-import-debug-grid,
+.store-debug-list {
+  min-width: 0;
+}
+
+.store-import-debug-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.store-import-debug-head strong,
+.store-import-debug-head span {
+  display: block;
+}
+
+.store-import-debug-head span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.store-import-debug-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+}
+
+.store-import-debug-grid article {
+  min-width: 0;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 8px;
+}
+
+.store-import-debug-grid span,
+.store-import-debug-grid strong,
+.store-import-debug-grid small,
+.store-debug-list span,
+.store-debug-list code {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.store-import-debug-grid span,
+.store-debug-list span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.store-import-debug-grid strong {
+  margin-top: 0.14rem;
+  color: #eafcf8;
+  font-size: 0.84rem;
+}
+
+.store-import-debug-grid small {
+  margin-top: 0.14rem;
+  color: rgba(231, 237, 246, 0.55);
+  font-size: 0.68rem;
+}
+
+.store-debug-list {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.store-debug-list code {
+  padding: 0.36rem 0.45rem;
+  color: rgba(231, 237, 246, 0.82);
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 7px;
+  direction: ltr;
+  text-align: left;
+  font-size: 0.72rem;
+}
+
 .store-import-gallery {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -7059,6 +7157,10 @@ body:has(.games-page) {
 
   .store-import-preview button {
     grid-column: auto;
+  }
+
+  .store-import-debug-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .related-products-row {

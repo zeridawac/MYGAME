@@ -171,21 +171,136 @@ const walkJson = (value, visitor) => {
   Object.values(value).forEach((item) => walkJson(item, visitor));
 };
 
-const normalizePrice = (value) => {
+const decodeEscapedText = (value = '') =>
+  decodeHtml(
+    String(value)
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+      .replace(/\\x([0-9a-fA-F]{2})/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+      .replace(/\\\//g, '/')
+      .replace(/\\n|\\r|\\t/g, ' ')
+  );
+
+const stripTags = (value = '') => decodeEscapedText(value).replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ');
+
+const normalizePrice = (value, divisor = 1) => {
   if (value === null || value === undefined) return 0;
-  const match = String(value).replace(/\s/g, '').match(/(\d+(?:[.,]\d+)?)/);
+  const match = decodeEscapedText(value).match(/(\d[\d\s.,']*)/);
   if (!match) return 0;
-  const parsed = Number(match[1].replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : 0;
+
+  let clean = match[1].replace(/[\s']/g, '');
+  const lastComma = clean.lastIndexOf(',');
+  const lastDot = clean.lastIndexOf('.');
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    clean = lastComma > lastDot ? clean.replace(/\./g, '').replace(',', '.') : clean.replace(/,/g, '');
+  } else if (lastComma !== -1) {
+    const parts = clean.split(',');
+    clean = parts.at(-1)?.length === 3 ? clean.replace(/,/g, '') : clean.replace(',', '.');
+  } else if (lastDot !== -1) {
+    const parts = clean.split('.');
+    clean = parts.at(-1)?.length === 3 && parts.length <= 2 ? clean.replace(/\./g, '') : clean;
+  }
+
+  const parsed = Number(clean);
+  const normalized = Number.isFinite(parsed) ? parsed / divisor : 0;
+  return Number.isFinite(normalized) ? normalized : 0;
 };
 
-const extractJsonLdProducts = (html) => {
-  const products = [];
-  const scriptPattern = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+const compactImportDebug = (debug = {}) => ({
+  success: Boolean(debug.success),
+  failureReason: debug.failureReason || '',
+  parserSourceUsed: debug.parserSourceUsed || '',
+  rawExtractedPrice: debug.rawExtractedPrice || null,
+  rawExtractedOriginalPrice: debug.rawExtractedOriginalPrice || null,
+  selectorsTried: (debug.selectorsTried || []).slice(0, 20),
+  parserSources: (debug.parserSources || []).slice(0, 20),
+  detectedPrices: (debug.detectedPrices || []).slice(0, 60),
+  selected: debug.selected || null,
+  imagesFound: debug.imagesFound || 0,
+});
+
+const createImportDebug = (url) => ({
+  url,
+  success: false,
+  failureReason: '',
+  parserSourceUsed: '',
+  rawExtractedPrice: null,
+  rawExtractedOriginalPrice: null,
+  selectorsTried: [],
+  parserSources: [],
+  detectedPrices: [],
+  selected: null,
+  imagesFound: 0,
+});
+
+const logTemuImportDebug = (debug, label = 'Temu import debug') => {
+  try {
+    console.error(`[${label}]`, JSON.stringify(compactImportDebug(debug), null, 2));
+  } catch {
+    console.error(`[${label}]`, debug?.failureReason || 'Unknown import failure');
+  }
+};
+
+const createTemuImportError = (message, debug, failureReason = message) => {
+  debug.failureReason = failureReason;
+  debug.success = false;
+  logTemuImportDebug(debug, 'Temu import failure');
+  const error = new Error(message);
+  error.debug = compactImportDebug(debug);
+  return error;
+};
+
+const extractScriptSources = (html, debug) => {
+  const sources = [];
+  const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   let match = scriptPattern.exec(html);
+  let index = 0;
 
   while (match) {
-    const json = parseJsonSafely(decodeHtml(match[1]));
+    index += 1;
+    const attrs = match[1] || '';
+    const content = match[2] || '';
+    const id = (attrs.match(/\bid=["']([^"']+)["']/i) || [])[1] || '';
+    const type = (attrs.match(/\btype=["']([^"']+)["']/i) || [])[1] || '';
+    const lowered = `${id} ${type} ${content.slice(0, 120)}`.toLowerCase();
+    let source = `script-${index}`;
+
+    if (id === '__NEXT_DATA__' || lowered.includes('__next_data__')) source = '__NEXT_DATA__';
+    else if (lowered.includes('nuxt')) source = 'window.NUXT';
+    else if (lowered.includes('hydration') || lowered.includes('__initial') || lowered.includes('__apollo')) source = 'hydration-state';
+    else if (type.includes('ld+json')) source = 'json-ld';
+    else if (type.includes('json')) source = 'json-script';
+
+    const text = decodeEscapedText(content);
+    const json = parseJsonSafely(decodeHtml(content).trim()) || parseJsonSafely(text.trim());
+    sources.push({ source, attrs, text, json });
+    match = scriptPattern.exec(html);
+  }
+
+  if (debug) {
+    debug.parserSources.push(
+      ...sources
+        .filter((item) => item.source !== 'script-1' || item.json || /price|product|temu|goods|sku/i.test(item.text))
+        .map((item) => ({
+          source: item.source,
+          parsedJson: Boolean(item.json),
+          length: item.text.length,
+        }))
+        .slice(0, 20)
+    );
+  }
+
+  return sources;
+};
+
+const extractJsonLdProducts = (html, scriptSources = []) => {
+  const products = [];
+  const jsonLdSources = scriptSources.length
+    ? scriptSources.filter((item) => item.source === 'json-ld')
+    : extractScriptSources(html).filter((item) => item.source === 'json-ld');
+
+  jsonLdSources.forEach((source) => {
+    const json = source.json || parseJsonSafely(source.text);
     walkJson(json, (node) => {
       const rawType = node['@type'];
       const types = Array.isArray(rawType) ? rawType : [rawType];
@@ -193,15 +308,14 @@ const extractJsonLdProducts = (html) => {
         products.push(node);
       }
     });
-    match = scriptPattern.exec(html);
-  }
+  });
 
   return products;
 };
 
 const normalizeCurrency = (value = '') => {
-  const token = String(value).trim().toUpperCase();
-  if (['MAD', 'DH', 'DHS', 'د.م', 'درهم'].includes(token)) return 'MAD';
+  const token = decodeEscapedText(value).trim().toUpperCase();
+  if (/^(MAD|DH|DHS|D\.?H\.?|د\.?\s*م|درهم|دراهم)$/i.test(token)) return 'MAD';
   if (['USD', '$', 'US$'].includes(token)) return 'USD';
   if (['EUR', '€'].includes(token)) return 'EUR';
   return token || 'MAD';
@@ -214,8 +328,21 @@ const currencyToDh = (currency) => {
   return 1;
 };
 
-const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source = 'page') => {
-  const parsedAmount = normalizePrice(amount);
+const serializePriceCandidate = (candidate) =>
+  candidate
+    ? {
+        amount: candidate.amount,
+        currency: candidate.currency,
+        dhPrice: candidate.dhPrice,
+        kind: candidate.kind,
+        source: candidate.source,
+        key: candidate.key || '',
+        rawText: candidate.rawText || '',
+      }
+    : null;
+
+const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source = 'page', meta = {}) => {
+  const parsedAmount = normalizePrice(amount, meta.divisor || 1);
   if (!parsedAmount || parsedAmount <= 0 || parsedAmount > 1000000) return null;
   const normalizedCurrency = normalizeCurrency(currency);
   const dhPrice = parsedAmount * currencyToDh(normalizedCurrency);
@@ -227,105 +354,331 @@ const buildPriceCandidate = (amount, currency = 'MAD', kind = 'unknown', source 
     dhPrice: Number(dhPrice.toFixed(2)),
     kind,
     source,
+    key: meta.key || '',
+    rawText: String(meta.rawText || amount || '').slice(0, 140),
+    context: String(meta.context || '').slice(0, 260),
   };
 };
 
-const collectPrice = (collection, amount, currency, kind, source) => {
-  const candidate = buildPriceCandidate(amount, currency, kind, source);
+const collectPrice = (collection, amount, currency, kind, source, meta = {}) => {
+  const candidate = buildPriceCandidate(amount, currency, kind, source, meta);
   if (candidate) collection.push(candidate);
 };
 
 const shouldSkipPriceContext = (context = '') =>
-  /shipping|delivery|coupon|voucher|tax|fee|threshold|minimum|ship|free|points|review|sold|rating|piece|qty/i.test(
-    context
+  /shipping|delivery|coupon|voucher|tax|fee|threshold|minimum|ship|free|points|review|sold|rating|piece|qty|quantity|stock|inventory|followers|comment|share|score|installment/i.test(
+    decodeEscapedText(context)
   );
 
 const inferVisiblePriceKind = (context = '') => {
-  if (/original|retail|list|was|before|market|strike|السعر\s*الأصلي|قبل|بدل|ancien|prix\s*initial/i.test(context)) {
+  const text = decodeEscapedText(context);
+  if (/original|origin|retail|list|was|before|market|strike|regular|old|base|السعر\s*الأصلي|قبل|بدل|ancien|prix\s*initial/i.test(text)) {
     return 'original';
   }
-  if (/sale|now|current|discount|deal|price|السعر|خصم|حاليا|maintenant|prix/i.test(context)) {
+  if (/sale|now|current|discount|deal|final|promo|activity|price|السعر|خصم|حاليا|maintenant|prix/i.test(text)) {
     return 'current';
   }
   return 'unknown';
 };
 
-const extractPriceCandidates = (html, jsonProduct) => {
+const inferKeyPriceKind = (key = '') => {
+  const text = String(key).toLowerCase();
+  if (/original|origin|retail|market|list|was|strike|before|regular|base|line|reference/.test(text)) {
+    return 'original';
+  }
+  if (/sale|sales|current|discount|final|promo|promotion|deal|activity|min|sku|display|actual|offer/.test(text)) {
+    return 'current';
+  }
+  return /price/.test(text) ? 'current' : 'unknown';
+};
+
+const findCurrencyNear = (text = '', index = 0, fallback = 'MAD') => {
+  const windowText = decodeEscapedText(text.slice(Math.max(0, index - 260), index + 360));
+  const currencyMatch =
+    windowText.match(/"(?:currency|priceCurrency|currencyCode|currencySymbol)"\s*:\s*"([^"]+)"/i) ||
+    windowText.match(/\b(MAD|USD|EUR|DHS?|DH|\$|€|د\.?\s*م|درهم|دراهم)\b/i);
+  return currencyMatch?.[1] || fallback;
+};
+
+const extractAmountFromPriceValue = (value, key = '') => {
+  if (typeof value === 'number' || typeof value === 'string') {
+    return {
+      amount: value,
+      divisor: /cent|cents|minor|fen|penny/i.test(key) ? 100 : 1,
+      rawText: value,
+    };
+  }
+
+  if (!value || typeof value !== 'object') return null;
+
+  const amountKeys = [
+    'amount',
+    'value',
+    'val',
+    'price',
+    'priceValue',
+    'priceText',
+    'priceStr',
+    'priceString',
+    'formattedPrice',
+    'displayPrice',
+    'centAmount',
+    'amountInCents',
+    'priceInCents',
+  ];
+
+  for (const amountKey of amountKeys) {
+    if (value[amountKey] !== undefined && value[amountKey] !== null) {
+      return {
+        amount: value[amountKey],
+        divisor: /cent|cents|minor|fen|penny/i.test(`${key}-${amountKey}`) ? 100 : 1,
+        rawText: typeof value[amountKey] === 'object' ? JSON.stringify(value[amountKey]).slice(0, 120) : value[amountKey],
+      };
+    }
+  }
+
+  return null;
+};
+
+const getNodeCurrency = (node, fallback = 'MAD') =>
+  node?.currency ||
+  node?.currencyCode ||
+  node?.priceCurrency ||
+  node?.currencySymbol ||
+  node?.amountCurrency ||
+  fallback;
+
+const collectPricesFromJsonObject = (json, source, candidates) => {
+  walkJson(json, (node) => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+
+    const keys = Object.keys(node);
+    const hasPriceSibling = keys.some((key) => /price|sale|retail|market|discount|original|strike|amount/i.test(key));
+    const currency = getNodeCurrency(node, 'MAD');
+
+    Object.entries(node).forEach(([key, value]) => {
+      const lowerKey = String(key).toLowerCase();
+      if (/discount|off|percent|percentage|rate/.test(lowerKey) && !/price/.test(lowerKey)) return;
+      const keyLooksPrice = /price|sale|retail|market|discount|original|strike|amount|cent/i.test(key);
+      if (!keyLooksPrice) return;
+      if (/^(amount|value|val|centAmount)$/i.test(key) && !hasPriceSibling) return;
+
+      const amountInfo = extractAmountFromPriceValue(value, key);
+      if (!amountInfo) return;
+
+      collectPrice(candidates, amountInfo.amount, currency, inferKeyPriceKind(key), source, {
+        key,
+        divisor: amountInfo.divisor,
+        rawText: amountInfo.rawText,
+        context: JSON.stringify(node).slice(0, 260),
+      });
+    });
+  });
+};
+
+const scanCurrencyText = (text, source, candidates, debug, defaultCurrency = 'MAD') => {
+  const normalizedText = decodeEscapedText(text);
+  const currencyToken = '(?:MAD|USD|EUR|DHS?|DH|دراهم|درهم|د\\.?\\s*م|\\$|€)';
+  const numberToken = "[0-9][0-9\\s.,']{0,14}";
+  const patterns = [
+    {
+      label: 'currency-before-number',
+      regex: new RegExp(`(${currencyToken})\\s*(${numberToken})`, 'gi'),
+      amountIndex: 2,
+      currencyIndex: 1,
+    },
+    {
+      label: 'number-before-currency',
+      regex: new RegExp(`(${numberToken})\\s*(${currencyToken})`, 'gi'),
+      amountIndex: 1,
+      currencyIndex: 2,
+    },
+  ];
+
+  patterns.forEach(({ label, regex, amountIndex, currencyIndex }) => {
+    let match = regex.exec(normalizedText);
+    let matches = 0;
+    while (match) {
+      matches += 1;
+      const context = normalizedText.slice(Math.max(0, match.index - 120), match.index + 180);
+      if (!shouldSkipPriceContext(context)) {
+        collectPrice(candidates, match[amountIndex], match[currencyIndex] || defaultCurrency, inferVisiblePriceKind(context), source, {
+          key: label,
+          rawText: match[0],
+          context,
+        });
+      }
+      match = regex.exec(normalizedText);
+    }
+
+    if (debug && source === 'selector') {
+      debug.selectorsTried.push({ selector: label, matches });
+    }
+  });
+};
+
+const scanKeyValuePrices = (text, source, candidates, fallbackCurrency = 'MAD') => {
+  const normalizedText = decodeEscapedText(text);
+  const priceKeys =
+    'salePrice|salesPrice|currentPrice|discountPrice|finalPrice|priceAmount|priceText|priceStr|priceString|goodsPrice|activityPrice|promoPrice|promotionPrice|dealPrice|minPrice|minSalePrice|skuPrice|displayPrice|actualPrice|offerPrice|price';
+  const originalKeys =
+    'originalPrice|originPrice|marketPrice|listPrice|wasPrice|strikePrice|strikeThroughPrice|beforePrice|basisPrice|retailPrice|linePrice|regularPrice|referencePrice';
+  const patterns = [
+    { kind: 'current', keys: priceKeys },
+    { kind: 'original', keys: originalKeys },
+  ];
+
+  patterns.forEach(({ kind, keys }) => {
+    const quotedPattern = new RegExp(`["'](${keys})["']\\s*:\\s*["']([^"']{1,140})["']`, 'gi');
+    const numberPattern = new RegExp(`["'](${keys})["']\\s*:\\s*([0-9]+(?:[.,][0-9]+)?)`, 'gi');
+    const objectPattern = new RegExp(`["'](${keys})["']\\s*:\\s*\\{([^{}]{1,520})\\}`, 'gi');
+    const bareQuotedPattern = new RegExp(`(?:^|[,{])\\s*(${keys})\\s*:\\s*["']([^"']{1,140})["']`, 'gi');
+    const bareNumberPattern = new RegExp(`(?:^|[,{])\\s*(${keys})\\s*:\\s*([0-9]+(?:[.,][0-9]+)?)`, 'gi');
+    const bareObjectPattern = new RegExp(`(?:^|[,{])\\s*(${keys})\\s*:\\s*\\{([^{}]{1,520})\\}`, 'gi');
+
+    [quotedPattern, numberPattern, bareQuotedPattern, bareNumberPattern].forEach((pattern) => {
+      let match = pattern.exec(normalizedText);
+      while (match) {
+        const currency = findCurrencyNear(normalizedText, match.index, fallbackCurrency);
+        const context = normalizedText.slice(Math.max(0, match.index - 120), match.index + 220);
+        if (!shouldSkipPriceContext(context)) {
+          collectPrice(candidates, match[2], currency, kind, source, {
+            key: match[1],
+            rawText: match[2],
+            context,
+          });
+        }
+        match = pattern.exec(normalizedText);
+      }
+    });
+
+    [objectPattern, bareObjectPattern].forEach((pattern) => {
+      let match = pattern.exec(normalizedText);
+      while (match) {
+        const block = match[2];
+        const amountMatch =
+          block.match(/["']?(?:amount|value|val|price|priceText|displayPrice|formattedPrice)["']?\s*:\s*["']?([^"',}]{1,80})/i) ||
+          block.match(/([0-9]+(?:[.,][0-9]+)?)/);
+        const currencyMatch = block.match(/["']?(?:currency|currencyCode|priceCurrency|currencySymbol)["']?\s*:\s*["']([^"']+)/i);
+        if (amountMatch) {
+          collectPrice(candidates, amountMatch[1], currencyMatch?.[1] || findCurrencyNear(normalizedText, match.index, fallbackCurrency), kind, source, {
+            key: match[1],
+            rawText: amountMatch[1],
+            context: block,
+          });
+        }
+        match = pattern.exec(normalizedText);
+      }
+    });
+  });
+};
+
+const scanSelectorLikePrices = (html, candidates, debug) => {
+  const selectors = [
+    {
+      selector: '[data-testid*="price"]',
+      regex: /<[^>]+data-testid=["'][^"']*price[^"']*["'][^>]*>([\s\S]{0,700}?)<\/[^>]+>/gi,
+    },
+    {
+      selector: '[data-test*="price"]',
+      regex: /<[^>]+data-test=["'][^"']*price[^"']*["'][^>]*>([\s\S]{0,700}?)<\/[^>]+>/gi,
+    },
+    {
+      selector: '[aria-label*="price"]',
+      regex: /<[^>]+aria-label=["']([^"']*price[^"']*)["'][^>]*>/gi,
+    },
+    {
+      selector: '[class*="price"]',
+      regex: /<[^>]+class=["'][^"']*(?:price|Price|sale|discount|original|retail)[^"']*["'][^>]*>([\s\S]{0,700}?)<\/[^>]+>/gi,
+    },
+    {
+      selector: '[class*="current"]',
+      regex: /<[^>]+class=["'][^"']*(?:current|now|deal|promo)[^"']*["'][^>]*>([\s\S]{0,700}?)<\/[^>]+>/gi,
+    },
+  ];
+
+  selectors.forEach(({ selector, regex }) => {
+    let match = regex.exec(html);
+    let matches = 0;
+    const beforeCount = candidates.length;
+    while (match) {
+      matches += 1;
+      scanCurrencyText(stripTags(match[1] || match[0]), 'selector', candidates, null);
+      scanKeyValuePrices(match[1] || match[0], 'selector', candidates);
+      match = regex.exec(html);
+    }
+    debug.selectorsTried.push({ selector, matches, candidates: candidates.length - beforeCount });
+  });
+};
+
+const extractPriceCandidates = (html, jsonProduct, scriptSources = [], debug) => {
   const candidates = [];
   const offer = Array.isArray(jsonProduct?.offers) ? jsonProduct.offers[0] : jsonProduct?.offers;
   const jsonCurrency = offer?.priceCurrency || jsonProduct?.priceCurrency || 'MAD';
 
-  collectPrice(candidates, jsonProduct?.price, jsonCurrency, 'current', 'json-ld');
-  collectPrice(candidates, offer?.price, jsonCurrency, 'current', 'json-ld');
-  collectPrice(candidates, offer?.lowPrice, jsonCurrency, 'current', 'json-ld');
-  collectPrice(candidates, offer?.highPrice, jsonCurrency, 'original', 'json-ld');
+  collectPrice(candidates, jsonProduct?.price, jsonCurrency, 'current', 'json-ld', { key: 'Product.price' });
+  collectPrice(candidates, offer?.price, jsonCurrency, 'current', 'json-ld', { key: 'Offer.price' });
+  collectPrice(candidates, offer?.lowPrice, jsonCurrency, 'current', 'json-ld', { key: 'Offer.lowPrice' });
+  collectPrice(candidates, offer?.highPrice, jsonCurrency, 'original', 'json-ld', { key: 'Offer.highPrice' });
+  collectPricesFromJsonObject(jsonProduct, 'json-ld-walk', candidates);
 
-  const metaCurrency = parseMetaValues(html, ['product:price:currency', 'og:price:currency'])[0] || jsonCurrency;
-  const metaPrice = parseMetaValues(html, ['product:price:amount', 'og:price:amount'])[0];
-  collectPrice(candidates, metaPrice, metaCurrency, 'current', 'meta');
+  const metaCurrency =
+    parseMetaValues(html, ['product:price:currency', 'og:price:currency', 'twitter:data1:currency'])[0] || jsonCurrency;
+  const metaPrice = parseMetaValues(html, [
+    'product:price:amount',
+    'og:price:amount',
+    'product:sale_price:amount',
+    'twitter:data1',
+    'twitter:label1',
+  ])[0];
+  const metaOriginalPrice = parseMetaValues(html, [
+    'product:original_price:amount',
+    'og:price:standard_amount',
+    'product:retail_price:amount',
+  ])[0];
+  collectPrice(candidates, metaPrice, metaCurrency, 'current', 'meta', { key: 'meta-current', rawText: metaPrice });
+  collectPrice(candidates, metaOriginalPrice, metaCurrency, 'original', 'meta', {
+    key: 'meta-original',
+    rawText: metaOriginalPrice,
+  });
 
-  const normalizedHtml = decodeHtml(html.replace(/\\u002F/g, '/').replace(/\\\//g, '/'));
-  const keyPatterns = [
-    {
-      kind: 'current',
-      pattern:
-        /"(?:salePrice|salesPrice|currentPrice|discountPrice|finalPrice|price|priceAmount)"\s*:\s*(?:"[^"]*?([0-9]+(?:[.,][0-9]+)?)"|\{[^{}]{0,260}?(?:"amount"|"value"|"price")\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?[^{}]*\})/gi,
-    },
-    {
-      kind: 'original',
-      pattern:
-        /"(?:originalPrice|retailPrice|marketPrice|listPrice|wasPrice|strikePrice|beforePrice)"\s*:\s*(?:"[^"]*?([0-9]+(?:[.,][0-9]+)?)"|\{[^{}]{0,260}?(?:"amount"|"value"|"price")\s*:\s*"?([0-9]+(?:[.,][0-9]+)?)"?[^{}]*\})/gi,
-    },
-  ];
+  const normalizedHtml = decodeEscapedText(html);
+  scanSelectorLikePrices(normalizedHtml, candidates, debug);
+  scanKeyValuePrices(normalizedHtml, 'embedded-json', candidates, metaCurrency);
+  scanCurrencyText(stripTags(normalizedHtml), 'visible-html', candidates, debug, metaCurrency);
+  scanCurrencyText(normalizedHtml, 'page-source', candidates, debug, metaCurrency);
 
-  keyPatterns.forEach(({ kind, pattern }) => {
-    let match = pattern.exec(normalizedHtml);
-    while (match) {
-      const currencyWindow = normalizedHtml.slice(Math.max(0, match.index - 180), match.index + 260);
-      const currencyMatch = currencyWindow.match(/"(?:currency|priceCurrency|currencyCode)"\s*:\s*"([A-Z$€]{1,5}|MAD|USD|EUR|DH)"/i);
-      collectPrice(candidates, match[1] || match[2], currencyMatch?.[1] || metaCurrency, kind, 'embedded-json');
-      match = pattern.exec(normalizedHtml);
+  scriptSources.forEach((source) => {
+    if (source.json) {
+      collectPricesFromJsonObject(source.json, source.source, candidates);
+    }
+    if (/price|amount|sale|retail|market|MAD|DH|درهم|دراهم/i.test(source.text)) {
+      scanKeyValuePrices(source.text, source.source, candidates, metaCurrency);
+      scanCurrencyText(source.text, source.source, candidates, debug, metaCurrency);
     }
   });
 
-  const visibleText = normalizedHtml.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ');
-  const currencyBeforePattern = /(?:MAD|USD|EUR|DH|DHS|\$|€|درهم|د\.م)\s*([0-9]+(?:[.,][0-9]+)?)/gi;
-  const currencyAfterPattern = /([0-9]+(?:[.,][0-9]+)?)\s*(?:MAD|USD|EUR|DH|DHS|\$|€|درهم|د\.م)/gi;
-
-  let match = currencyBeforePattern.exec(visibleText);
-  while (match) {
-    const currency = match[0].replace(match[1], '').trim();
-    const context = visibleText.slice(Math.max(0, match.index - 90), match.index + 120);
-    if (!shouldSkipPriceContext(context)) {
-      collectPrice(candidates, match[1], currency, inferVisiblePriceKind(context), 'visible-text');
-    }
-    match = currencyBeforePattern.exec(visibleText);
-  }
-
-  match = currencyAfterPattern.exec(visibleText);
-  while (match) {
-    const currency = match[0].replace(match[1], '').trim();
-    const context = visibleText.slice(Math.max(0, match.index - 90), match.index + 120);
-    if (!shouldSkipPriceContext(context)) {
-      collectPrice(candidates, match[1], currency, inferVisiblePriceKind(context), 'visible-text');
-    }
-    match = currencyAfterPattern.exec(visibleText);
-  }
-
   const seen = new Set();
-  return candidates.filter((candidate) => {
-    const key = `${candidate.kind}-${candidate.currency}-${candidate.amount}`;
+  const uniqueCandidates = candidates.filter((candidate) => {
+    const key = `${candidate.kind}-${candidate.currency}-${candidate.amount}-${candidate.source}-${candidate.key}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+
+  if (debug) {
+    debug.detectedPrices = uniqueCandidates.map(serializePriceCandidate);
+  }
+
+  return uniqueCandidates;
 };
 
-const extractDiscount = (html) => {
-  const text = decodeHtml(html);
+const extractDiscount = (html, scriptSources = []) => {
+  const text = decodeEscapedText([html, ...scriptSources.map((source) => source.text)].join(' '));
   const match =
     text.match(/-\s*(\d{1,2})\s*%/) ||
-    text.match(/(\d{1,2})\s*%\s*(?:off|discount|خصم)/i) ||
+    text.match(/(\d{1,2})\s*%\s*(?:off|discount|خصم|sale)/i) ||
+    text.match(/(?:discount|discountRate|discountPercent|offRate)["']?\s*[:=]\s*["']?(\d{1,2})/i) ||
     text.match(/خصم\s*(\d{1,2})\s*%/i);
 
   if (!match) return 0;
@@ -333,42 +686,59 @@ const extractDiscount = (html) => {
   return Number.isFinite(discount) ? Math.max(0, Math.min(95, discount)) : 0;
 };
 
-const extractImages = (html, jsonProduct) => {
+const upgradeImageUrl = (url = '') => {
+  try {
+    const parsed = new URL(url);
+    ['imageMogr2', 'thumbnail', 'resize', 'x-oss-process'].forEach((key) => parsed.searchParams.delete(key));
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+};
+
+const extractImages = (html, jsonProduct, scriptSources = [], debug) => {
   const jsonImages = Array.isArray(jsonProduct?.image) ? jsonProduct.image : [jsonProduct?.image];
   const metaImages = parseMetaValues(html, ['og:image', 'og:image:secure_url', 'twitter:image']);
-  const normalizedHtml = decodeHtml(
-    html
-      .replace(/\\u002F/g, '/')
-      .replace(/\\u0026/g, '&')
-      .replace(/\\\//g, '/')
-  );
+  const normalizedHtml = decodeEscapedText(html);
   const urlMatches = normalizedHtml.match(/(?:https?:)?\/\/[^"'<>\\\s]+/gi) || [];
   const attributeMatches = [];
-  const attributePattern = /(?:src|data-src|data-original|href|content)=["']([^"']+)["']/gi;
+  const attributePattern = /(?:src|data-src|data-original|data-lazy-src|data-thumb|href|content)=["']([^"']+)["']/gi;
   let attributeMatch = attributePattern.exec(normalizedHtml);
   while (attributeMatch) {
     attributeMatches.push(attributeMatch[1]);
     attributeMatch = attributePattern.exec(normalizedHtml);
   }
   const jsonDiscovered = [];
-  walkJson(jsonProduct, (node) => {
+  const collectJsonImages = (json) => walkJson(json, (node) => {
     Object.entries(node).forEach(([key, value]) => {
-      if (!/image|img|thumb|gallery|pic|url/i.test(key)) return;
+      if (!/image|img|thumb|thumbnail|gallery|pic|photo|mainUrl|url/i.test(key)) return;
       if (typeof value === 'string') jsonDiscovered.push(value);
+      if (value?.url) jsonDiscovered.push(value.url);
+      if (value?.imageUrl) jsonDiscovered.push(value.imageUrl);
+      if (value?.thumbUrl) jsonDiscovered.push(value.thumbUrl);
+      if (value?.originUrl) jsonDiscovered.push(value.originUrl);
       if (Array.isArray(value)) {
         value.forEach((item) => {
           if (typeof item === 'string') jsonDiscovered.push(item);
           if (item?.url) jsonDiscovered.push(item.url);
           if (item?.imageUrl) jsonDiscovered.push(item.imageUrl);
+          if (item?.thumbUrl) jsonDiscovered.push(item.thumbUrl);
+          if (item?.originUrl) jsonDiscovered.push(item.originUrl);
         });
       }
     });
+  });
+  collectJsonImages(jsonProduct);
+  scriptSources.forEach((source) => {
+    if (source.json) collectJsonImages(source.json);
+    const scriptUrls = source.text.match(/(?:https?:)?\/\/[^"'<>\\\s]+/gi) || [];
+    jsonDiscovered.push(...scriptUrls);
   });
 
   const imageLike = [...jsonImages, ...jsonDiscovered, ...metaImages, ...attributeMatches, ...urlMatches]
     .map((url) => {
       const normalized = String(url || '').startsWith('//') ? `https:${url}` : url;
-      return sanitizeImageUrl(normalized);
+      return upgradeImageUrl(sanitizeImageUrl(normalized));
     })
     .filter((url) => {
       if (!url) return false;
@@ -376,19 +746,29 @@ const extractImages = (html, jsonProduct) => {
       return (
         /\.(jpg|jpeg|png|webp)(?:$|\?)/i.test(lowered) ||
         lowered.includes('img.kwcdn.com') ||
+        lowered.includes('temu') ||
+        lowered.includes('kwcdn') ||
         lowered.includes('image') ||
+        lowered.includes('img') ||
         lowered.includes('thumb') ||
+        lowered.includes('thumbnail') ||
         lowered.includes('gallery')
       );
     });
 
   const byBaseUrl = new Map();
   imageLike.forEach((url) => {
-    const key = url.split('?')[0].replace(/_(?:100x100|200x200|300x300|400x400|thumbnail)/gi, '');
-    if (!byBaseUrl.has(key)) byBaseUrl.set(key, url);
+    const key = url
+      .split('?')[0]
+      .replace(/_(?:80x80|100x100|160x160|200x200|300x300|400x400|thumbnail|thumb)/gi, '')
+      .replace(/\/(?:thumb|thumbnail)\//gi, '/');
+    const current = byBaseUrl.get(key);
+    if (!current || url.length > current.length) byBaseUrl.set(key, url);
   });
 
-  return [...byBaseUrl.values()].slice(0, 12);
+  const images = [...byBaseUrl.values()].slice(0, 16);
+  if (debug) debug.imagesFound = images.length;
+  return images;
 };
 
 const guessCategory = (title = '') => {
@@ -485,8 +865,89 @@ const fetchTemuHtml = async (url) => {
   }
 };
 
+const scorePriceCandidate = (candidate) => {
+  const sourceScore = {
+    selector: 0,
+    'visible-html': 1,
+    'page-source': 2,
+    __NEXT_DATA__: 3,
+    'window.NUXT': 3,
+    'hydration-state': 3,
+    'json-script': 4,
+    meta: 5,
+    'json-ld': 6,
+    'json-ld-walk': 6,
+    'embedded-json': 7,
+  };
+  const kindScore = candidate.kind === 'current' ? 0 : candidate.kind === 'original' ? 1 : 2;
+  return (sourceScore[candidate.source] ?? 8) * 10 + kindScore;
+};
+
+const pickBestCurrentPrice = (candidates) => {
+  const explicitCurrent = candidates.filter((candidate) => candidate.kind === 'current');
+  if (explicitCurrent.length) {
+    return explicitCurrent.sort((a, b) => scorePriceCandidate(a) - scorePriceCandidate(b) || a.dhPrice - b.dhPrice)[0];
+  }
+
+  const unknown = candidates.filter((candidate) => candidate.kind === 'unknown').sort((a, b) => a.dhPrice - b.dhPrice);
+  return unknown[0] || null;
+};
+
+const pickBestOriginalPrice = (candidates, currentCandidate) => {
+  const higherThanCurrent = (candidate) => !currentCandidate || candidate.dhPrice > currentCandidate.dhPrice;
+  const explicitOriginal = candidates
+    .filter((candidate) => candidate.kind === 'original' && higherThanCurrent(candidate))
+    .sort((a, b) => b.dhPrice - a.dhPrice || scorePriceCandidate(a) - scorePriceCandidate(b));
+
+  if (explicitOriginal.length) return explicitOriginal[0];
+
+  const unknownOriginal = candidates
+    .filter((candidate) => candidate.kind === 'unknown' && higherThanCurrent(candidate))
+    .sort((a, b) => b.dhPrice - a.dhPrice);
+
+  return unknownOriginal[0] || null;
+};
+
+const selectImportPrices = (candidates, detectedDiscount, debug) => {
+  const plausibleCandidates = candidates
+    .filter((candidate) => candidate.dhPrice >= MIN_PRODUCT_PRICE_DH && candidate.dhPrice <= 100000)
+    .sort((a, b) => scorePriceCandidate(a) - scorePriceCandidate(b) || a.dhPrice - b.dhPrice);
+
+  const currentCandidate = pickBestCurrentPrice(plausibleCandidates);
+  let originalCandidate = pickBestOriginalPrice(plausibleCandidates, currentCandidate);
+  let derivedCurrentCandidate = null;
+
+  if (!currentCandidate && originalCandidate && detectedDiscount > 0) {
+    const derivedDhPrice = originalCandidate.dhPrice * (1 - detectedDiscount / 100);
+    derivedCurrentCandidate = buildPriceCandidate(derivedDhPrice, 'MAD', 'current', 'derived-from-discount', {
+      key: 'discount-derived',
+      rawText: `${originalCandidate.dhPrice} DH - ${detectedDiscount}%`,
+    });
+  }
+
+  const selectedCurrent = currentCandidate || derivedCurrentCandidate;
+  if (!originalCandidate && selectedCurrent) {
+    originalCandidate = pickBestOriginalPrice(plausibleCandidates, selectedCurrent);
+  }
+
+  if (debug) {
+    debug.selected = {
+      current: serializePriceCandidate(selectedCurrent),
+      original: serializePriceCandidate(originalCandidate),
+      discount: detectedDiscount || 0,
+    };
+    debug.rawExtractedPrice = selectedCurrent?.rawText || null;
+    debug.rawExtractedOriginalPrice = originalCandidate?.rawText || null;
+    debug.parserSourceUsed = selectedCurrent?.source || '';
+  }
+
+  return { currentCandidate: selectedCurrent, originalCandidate };
+};
+
 const buildImportedProductPreview = (url, html) => {
-  const [jsonProduct = {}] = extractJsonLdProducts(html);
+  const debug = createImportDebug(url);
+  const scriptSources = extractScriptSources(html, debug);
+  const [jsonProduct = {}] = extractJsonLdProducts(html, scriptSources);
   const title =
     stripTemuTitle(jsonProduct.name) ||
     stripTemuTitle(parseMetaValues(html, ['og:title', 'twitter:title'])[0]) ||
@@ -495,56 +956,36 @@ const buildImportedProductPreview = (url, html) => {
     decodeHtml(jsonProduct.description) ||
     decodeHtml(parseMetaValues(html, ['og:description', 'description', 'twitter:description'])[0]) ||
     title;
-  const images = extractImages(html, jsonProduct).map((imageUrl, index) => ({
+  const images = extractImages(html, jsonProduct, scriptSources, debug).map((imageUrl, index) => ({
     url: imageUrl,
     name: `temu-image-${index + 1}`,
     mimeType: 'external/image',
   }));
   const rating = normalizeNumber(jsonProduct.aggregateRating?.ratingValue, null);
-  const prices = extractPriceCandidates(html, jsonProduct);
-  const sourceRank = { 'visible-text': 0, meta: 1, 'json-ld': 2, 'embedded-json': 3 };
-  const bySourceThenPrice = (a, b) => (sourceRank[a.source] ?? 9) - (sourceRank[b.source] ?? 9) || a.dhPrice - b.dhPrice;
-  const visibleUnknownCandidates = prices
-    .filter((candidate) => candidate.kind === 'unknown' && candidate.source === 'visible-text')
-    .sort((a, b) => a.dhPrice - b.dhPrice);
-  const currentCandidates = prices
-    .filter((candidate) => candidate.kind === 'current')
-    .sort(bySourceThenPrice);
-  const unknownCandidates = prices
-    .filter((candidate) => candidate.kind === 'unknown')
-    .sort((a, b) => a.dhPrice - b.dhPrice);
-  const currentCandidate =
-    visibleUnknownCandidates.length >= 2 ? visibleUnknownCandidates[0] : currentCandidates[0] || unknownCandidates[0];
-  const originalCandidates = prices
-    .filter((candidate) => candidate.kind === 'original')
-    .sort((a, b) => b.dhPrice - a.dhPrice);
-  const visibleOriginalCandidate =
-    visibleUnknownCandidates.length >= 2 && currentCandidate
-      ? visibleUnknownCandidates.filter((candidate) => candidate.dhPrice > currentCandidate.dhPrice).pop()
-      : null;
-  const originalCandidate =
-    originalCandidates.find((candidate) => currentCandidate && candidate.dhPrice > currentCandidate.dhPrice) ||
-    visibleOriginalCandidate ||
-    (unknownCandidates.length > 1 && currentCandidate
-      ? unknownCandidates.filter((candidate) => candidate.dhPrice > currentCandidate.dhPrice).pop()
-      : null);
+  const prices = extractPriceCandidates(html, jsonProduct, scriptSources, debug);
+  const detectedDiscount = extractDiscount(html, scriptSources);
+  const { currentCandidate, originalCandidate } = selectImportPrices(prices, detectedDiscount, debug);
   const currentPriceDh = currentCandidate?.dhPrice || 0;
   const originalPriceDh = originalCandidate?.dhPrice || currentPriceDh;
   if (!currentCandidate || currentPriceDh <= 0) {
-    throw new Error(TEMU_PRICE_ERROR);
+    throw createTemuImportError(TEMU_PRICE_ERROR, debug, 'لم يتم العثور على سعر حالي صالح بعد فحص المحددات والسكريبتات والميتا ومصدر الصفحة.');
   }
   const finalPrice = Math.round(currentPriceDh * DH_TO_COINS);
   const originalPrice = Math.max(finalPrice, Math.round(originalPriceDh * DH_TO_COINS));
   const discountPercent =
-    originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : 0;
+    originalPrice > finalPrice ? Math.round(((originalPrice - finalPrice) / originalPrice) * 100) : detectedDiscount || 0;
 
   if (!title || !images.length) {
-    throw new Error(TEMU_IMPORT_ERROR);
+    throw createTemuImportError(TEMU_IMPORT_ERROR, debug, !title ? 'تعذر العثور على عنوان المنتج.' : 'تعذر العثور على صور المنتج.');
   }
 
-  const detectedDiscount = extractDiscount(html);
   const stockQuantity = stableNumber(`${title}-${url}`, 6, 24);
   const promoBadge = discountPercent >= 45 ? 'عرض محدود' : discountPercent >= 30 ? 'خصم قوي' : 'وصل حديثا';
+  debug.success = true;
+  debug.failureReason = '';
+  debug.parserSourceUsed = currentCandidate.source;
+  debug.rawExtractedPrice = currentCandidate.rawText || `${currentCandidate.amount} ${currentCandidate.currency}`;
+  debug.rawExtractedOriginalPrice = originalCandidate?.rawText || (originalCandidate ? `${originalCandidate.amount} ${originalCandidate.currency}` : null);
 
   return {
     title,
@@ -567,6 +1008,7 @@ const buildImportedProductPreview = (url, html) => {
     sourceOriginalPriceDh: originalCandidate ? Number(originalPriceDh.toFixed(2)) : null,
     detectedDiscount,
     images,
+    importDebug: compactImportDebug(debug),
   };
 };
 
@@ -796,15 +1238,34 @@ const adminPreviewProductImport = asyncHandler(async (req, res) => {
     const sourceUrl = assertTemuUrl(req.body.url);
     const html = await fetchTemuHtml(sourceUrl);
     const product = buildImportedProductPreview(sourceUrl, html);
+    const debug = product.importDebug;
 
     res.json({
       success: true,
       message: 'تم جلب معاينة المنتج',
       product,
+      debug,
     });
   } catch (error) {
-    res.status(400);
-    throw new Error(error.message === TEMU_PRICE_ERROR ? TEMU_PRICE_ERROR : TEMU_IMPORT_ERROR);
+    const message = error.message === TEMU_PRICE_ERROR ? TEMU_PRICE_ERROR : TEMU_IMPORT_ERROR;
+    const debug =
+      error.debug ||
+      compactImportDebug({
+        success: false,
+        failureReason: error.message || message,
+        parserSourceUsed: '',
+        detectedPrices: [],
+        selectorsTried: [],
+        parserSources: [],
+      });
+    if (!error.debug) {
+      logTemuImportDebug(debug, 'Temu import failure');
+    }
+    res.status(400).json({
+      success: false,
+      message,
+      debug,
+    });
   }
 });
 
