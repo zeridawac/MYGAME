@@ -13,6 +13,7 @@ import {
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatCoinDh } from '../utils/coins.js';
+import OnboardingGate from './OnboardingGate.jsx';
 import StoreAnnouncementPopup from './StoreAnnouncementPopup.jsx';
 
 const baseNav = [
@@ -93,6 +94,7 @@ const AppLayout = () => {
           <span>خروج</span>
         </button>
       </nav>
+      <OnboardingGate />
       <StoreAnnouncementPopup />
     </div>
   );

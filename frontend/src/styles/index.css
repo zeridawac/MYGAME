@@ -4360,6 +4360,20 @@ th {
   padding: 0.6rem;
 }
 
+.admin-bank-details {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 180px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.admin-bank-details strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
 .table-button {
   min-height: 34px;
   padding: 0.45rem 0.7rem;
@@ -4452,6 +4466,241 @@ th {
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
+}
+
+.onboarding-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(62, 226, 197, 0.18), transparent 26rem),
+    radial-gradient(circle at 12% 88%, rgba(247, 201, 72, 0.12), transparent 24rem),
+    rgba(3, 6, 10, 0.88);
+  backdrop-filter: blur(20px);
+  animation: fadeIn 180ms ease both;
+}
+
+.onboarding-panel {
+  width: min(980px, 100%);
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035)),
+    rgba(10, 15, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 32px 120px rgba(0, 0, 0, 0.56);
+  animation: portalFadeUp 320ms ease both;
+}
+
+.onboarding-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.onboarding-heading h2,
+.onboarding-heading p,
+.onboarding-card h3,
+.onboarding-card p {
+  margin: 0;
+}
+
+.onboarding-heading h2 {
+  margin-top: 0.14rem;
+  font-size: clamp(1.35rem, 4vw, 2rem);
+}
+
+.onboarding-heading p,
+.onboarding-card p {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.onboarding-seal {
+  flex: 0 0 auto;
+  width: 3.4rem;
+  height: 3.4rem;
+  display: grid;
+  place-items: center;
+  color: #06100d;
+  background: linear-gradient(135deg, var(--cyan), #d9fff7);
+  border-radius: 14px;
+  box-shadow: 0 16px 42px rgba(62, 226, 197, 0.18);
+}
+
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.onboarding-steps article {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 0;
+  padding: 0.62rem 0.72rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.onboarding-steps article.done {
+  color: #dfffee;
+  background: rgba(87, 214, 141, 0.13);
+  border-color: rgba(87, 214, 141, 0.28);
+}
+
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.onboarding-card {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 0.9rem;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(62, 226, 197, 0.1), transparent 14rem),
+    rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+}
+
+.onboarding-card.completed {
+  border-color: rgba(87, 214, 141, 0.26);
+}
+
+.onboarding-card-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.onboarding-card-title svg {
+  flex: 0 0 auto;
+  color: var(--cyan);
+}
+
+.onboarding-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.onboarding-form label {
+  display: grid;
+  gap: 0.32rem;
+}
+
+.onboarding-form label span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.onboarding-location-box {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.onboarding-complete-message,
+.onboarding-error {
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  line-height: 1.7;
+}
+
+.onboarding-complete-message {
+  color: #dfffee;
+  background: rgba(87, 214, 141, 0.13);
+  border: 1px solid rgba(87, 214, 141, 0.26);
+}
+
+.onboarding-error {
+  margin: 0;
+  color: #ffd9df;
+  background: rgba(255, 92, 112, 0.12);
+  border: 1px solid rgba(255, 92, 112, 0.24);
+}
+
+@media (max-width: 620px) {
+  .onboarding-lock {
+    align-items: start;
+    padding: 0.65rem;
+  }
+
+  .onboarding-panel {
+    gap: 0.72rem;
+    padding: 0.75rem;
+    border-radius: 14px;
+  }
+
+  .onboarding-heading {
+    align-items: flex-start;
+    gap: 0.62rem;
+  }
+
+  .onboarding-seal {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 12px;
+  }
+
+  .onboarding-heading h2 {
+    font-size: 1.18rem;
+  }
+
+  .onboarding-heading p,
+  .onboarding-card p {
+    font-size: 0.84rem;
+    line-height: 1.65;
+  }
+
+  .onboarding-steps,
+  .onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-steps article {
+    min-height: 42px;
+    padding: 0.5rem 0.62rem;
+    font-size: 0.82rem;
+  }
+
+  .onboarding-card {
+    gap: 0.68rem;
+    padding: 0.72rem;
+    border-radius: 12px;
+  }
+
+  .onboarding-card-title {
+    gap: 0.52rem;
+  }
+
+  .onboarding-card-title h3 {
+    font-size: 1rem;
+  }
+
+  .onboarding-form {
+    gap: 0.55rem;
+  }
+
+  .onboarding-form input,
+  .onboarding-location-box .primary-button,
+  .onboarding-form .primary-button {
+    min-height: 44px;
+  }
 }
 
 .mobile-nav {

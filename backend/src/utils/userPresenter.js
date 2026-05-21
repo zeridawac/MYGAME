@@ -1,3 +1,12 @@
+const hasVerifiedLocation = (user) => {
+  const location = user.lastKnownLocation || {};
+  return (
+    !location.unavailable &&
+    Number.isFinite(Number(location.latitude)) &&
+    Number.isFinite(Number(location.longitude))
+  );
+};
+
 const presentUser = (user) => ({
   id: user._id,
   username: user.username,
@@ -10,6 +19,7 @@ const presentUser = (user) => ({
   spinCount: user.spinCount,
   lastSpinDate: user.lastSpinDate,
   lastLoginDate: user.lastLoginDate,
+  locationVerified: hasVerifiedLocation(user),
   bankDetails: user.bankDetails || null,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,

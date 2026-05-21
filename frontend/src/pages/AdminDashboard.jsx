@@ -585,32 +585,51 @@ const AdminDashboard = () => {
                 <tr>
                   <th>المستخدم</th>
                   <th>عملات</th>
+                  <th>معلومات السحب</th>
                   <th>حفظ</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((item) => (
-                  <tr key={item._id}>
-                    <td>
-                      {item.username} {item.isAdmin ? '• مدير' : ''}
-                    </td>
-                    {['coins'].map((field) => (
-                      <td key={field}>
-                        <input
-                          type="number"
-                          min="0"
-                          defaultValue={item[field]}
-                          onChange={(event) => setEdit(item._id, field, event.target.value)}
-                        />
+                {users.map((item) => {
+                  const bankDetails = item.bankDetails || {};
+                  const hasBankInfo =
+                    bankDetails.fullName && bankDetails.bankName && bankDetails.accountNumber && bankDetails.phone;
+
+                  return (
+                    <tr key={item._id}>
+                      <td>
+                        {item.username} {item.isAdmin ? '• مدير' : ''}
                       </td>
-                    ))}
-                    <td>
-                      <button className="ghost-button table-button" type="button" onClick={() => updateUser(item._id)}>
-                        حفظ
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {['coins'].map((field) => (
+                        <td key={field}>
+                          <input
+                            type="number"
+                            min="0"
+                            defaultValue={item[field]}
+                            onChange={(event) => setEdit(item._id, field, event.target.value)}
+                          />
+                        </td>
+                      ))}
+                      <td>
+                        {hasBankInfo ? (
+                          <div className="admin-bank-details">
+                            <strong>{bankDetails.fullName}</strong>
+                            <span>{bankDetails.bankName}</span>
+                            <span>{bankDetails.accountNumber}</span>
+                            <span>{bankDetails.phone}</span>
+                          </div>
+                        ) : (
+                          <span className="status-badge status-pending">غير مكتملة</span>
+                        )}
+                      </td>
+                      <td>
+                        <button className="ghost-button table-button" type="button" onClick={() => updateUser(item._id)}>
+                          حفظ
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
