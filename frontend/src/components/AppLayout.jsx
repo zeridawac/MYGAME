@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSettings } from '../context/SettingsContext.jsx';
 import { formatCoinDh } from '../utils/coins.js';
+import MaintenanceMode from './MaintenanceMode.jsx';
 import OnboardingGate from './OnboardingGate.jsx';
 import StoreAnnouncementPopup from './StoreAnnouncementPopup.jsx';
 
@@ -26,15 +28,23 @@ const baseNav = [
 
 const AppLayout = () => {
   const { user, logout } = useAuth();
+  const { platform } = useSettings();
   const navigate = useNavigate();
-  const navItems = user?.isAdmin
-    ? [...baseNav, { to: '/admin', label: 'الإدارة', icon: ShieldCheck }]
-    : baseNav;
+  const storeEnabled = platform?.storeEnabled !== false;
+  const visibleBaseNav = baseNav.filter((item) => {
+    if (user?.isAdmin || storeEnabled) return true;
+    return !['/store', '/cart'].includes(item.to);
+  });
+  const navItems = user?.isAdmin ? [...visibleBaseNav, { to: '/admin', label: 'الإدارة', icon: ShieldCheck }] : visibleBaseNav;
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  if (platform?.maintenanceMode && !user?.isAdmin) {
+    return <MaintenanceMode />;
+  }
 
   return (
     <div className="app-shell">
@@ -65,7 +75,12 @@ const AppLayout = () => {
       </aside>
 
       <main className="main-content">
-        <button className="portal-support-fab app-support-fab" type="button" onClick={() => navigate('/?support=1')} aria-label="التواصل مع الأدمن">
+        <button
+          className="portal-support-fab app-support-fab"
+          type="button"
+          onClick={() => navigate('/?support=1')}
+          aria-label="التواصل مع الأدمن"
+        >
           <Headphones size={22} />
           <span>تواصل مع الأدمن</span>
         </button>
@@ -95,7 +110,7 @@ const AppLayout = () => {
         </button>
       </nav>
       <OnboardingGate />
-      <StoreAnnouncementPopup />
+      {storeEnabled ? <StoreAnnouncementPopup /> : null}
     </div>
   );
 };

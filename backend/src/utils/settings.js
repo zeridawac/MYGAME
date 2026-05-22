@@ -9,6 +9,10 @@ const DEFAULT_STORE_POPUP = {
   buttonText: 'دخول المتجر',
   targetPath: '/store',
 };
+const DEFAULT_PLATFORM_SETTINGS = {
+  maintenanceMode: false,
+  storeEnabled: true,
+};
 
 const getCoinRate = async () => {
   const setting = await Setting.findOne({ key: 'coinConversion' });
@@ -63,12 +67,40 @@ const setStorePopup = async (payload = {}) => {
   );
 };
 
+const getPlatformSettings = async () => {
+  const setting = await Setting.findOne({ key: 'platformSettings' });
+
+  return {
+    ...DEFAULT_PLATFORM_SETTINGS,
+    ...(setting?.value || {}),
+  };
+};
+
+const setPlatformSettings = async (payload = {}) => {
+  const current = await getPlatformSettings();
+  const nextValue = {
+    ...current,
+    maintenanceMode:
+      payload.maintenanceMode === undefined ? current.maintenanceMode : Boolean(payload.maintenanceMode),
+    storeEnabled: payload.storeEnabled === undefined ? current.storeEnabled : Boolean(payload.storeEnabled),
+  };
+
+  return Setting.findOneAndUpdate(
+    { key: 'platformSettings' },
+    { value: nextValue },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+};
+
 module.exports = {
   DEFAULT_COINS_PER_DOLLAR,
   DEFAULT_STORE_POPUP,
+  DEFAULT_PLATFORM_SETTINGS,
   getCoinRate,
+  getPlatformSettings,
   getStorePopup,
   setCoinRate,
+  setPlatformSettings,
   setStorePopup,
   coinsToUsd,
 };

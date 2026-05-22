@@ -42,6 +42,10 @@ const getMediaType = (filename = '') => {
     return 'video';
   }
 
+  if (['.ogg', '.mp3', '.m4a', '.wav'].includes(extension)) {
+    return 'audio';
+  }
+
   return 'file';
 };
 

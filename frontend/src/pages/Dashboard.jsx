@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import api from '../api/config.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSettings } from '../context/SettingsContext.jsx';
 import { formatCoinDh, formatCoins } from '../utils/coins.js';
 import { productImageUrl } from '../utils/storeImages.js';
 
@@ -33,6 +34,8 @@ const DashboardProduct = ({ product }) => (
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { platform } = useSettings();
+  const storeEnabled = platform?.storeEnabled !== false;
   const [products, setProducts] = useState([]);
   const [market, setMarket] = useState(null);
 
@@ -40,7 +43,7 @@ const Dashboard = () => {
     const loadDashboard = async () => {
       try {
         const [productsRes, marketRes] = await Promise.allSettled([
-          api.get('/store/products'),
+          storeEnabled ? api.get('/store/products') : Promise.resolve({ data: { products: [] } }),
           api.get('/trading/market'),
         ]);
 
@@ -56,7 +59,7 @@ const Dashboard = () => {
     };
 
     loadDashboard();
-  }, []);
+  }, [storeEnabled]);
 
   const featured = useMemo(
     () => [...products].sort((a, b) => Number(b.featured) - Number(a.featured) || b.discountPercent - a.discountPercent).slice(0, 4),
@@ -98,7 +101,7 @@ const Dashboard = () => {
       </section>
 
       <section className="home-action-strip">
-        {quickCards.map((card) => (
+        {quickCards.filter((card) => storeEnabled || card.to !== '/store').map((card) => (
           <Link className="home-action-card" to={card.to} key={card.to}>
             <card.icon size={20} />
             <strong>{card.title}</strong>
@@ -124,7 +127,7 @@ const Dashboard = () => {
         </div>
       </section>
 
-      {featured.length ? (
+      {storeEnabled && featured.length ? (
         <section className="home-section">
           <div className="section-heading compact-heading">
             <div>
@@ -141,7 +144,7 @@ const Dashboard = () => {
         </section>
       ) : null}
 
-      {hotDeals.length ? (
+      {storeEnabled && hotDeals.length ? (
         <section className="home-section">
           <div className="section-heading compact-heading">
             <div>
@@ -163,7 +166,7 @@ const Dashboard = () => {
         </section>
       ) : null}
 
-      {newArrivals.length ? (
+      {storeEnabled && newArrivals.length ? (
         <section className="home-section">
           <div className="section-heading compact-heading">
             <div>

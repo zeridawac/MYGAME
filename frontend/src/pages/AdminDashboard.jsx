@@ -24,6 +24,7 @@ import api from '../api/config.js';
 import EmptyState from '../components/EmptyState.jsx';
 import Loading from '../components/Loading.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useSettings } from '../context/SettingsContext.jsx';
 import { formatCoins } from '../utils/coins.js';
 import { productImageUrl } from '../utils/storeImages.js';
 
@@ -112,6 +113,10 @@ const AdminDashboard = () => {
     buttonText: 'دخول المتجر',
     targetPath: '/store',
   });
+  const [platformForm, setPlatformForm] = useState({
+    maintenanceMode: false,
+    storeEnabled: true,
+  });
   const [activity, setActivity] = useState([]);
   const [userActivity, setUserActivity] = useState([]);
   const [activeMapUser, setActiveMapUser] = useState(null);
@@ -160,6 +165,7 @@ const AdminDashboard = () => {
   });
   const [userEdits, setUserEdits] = useState({});
   const { showToast } = useToast();
+  const { updatePlatformLocal } = useSettings();
 
   const stats = useMemo(
     () => ({
@@ -190,6 +196,7 @@ const AdminDashboard = () => {
         storeProductsRes,
         storeOrdersRes,
         popupRes,
+        platformRes,
         userActivityRes,
         activityRes,
       ] = await Promise.all([
@@ -202,6 +209,7 @@ const AdminDashboard = () => {
         api.get('/admin/store/products'),
         api.get('/admin/store/orders'),
         api.get('/admin/settings/store-popup'),
+        api.get('/admin/settings/platform'),
         api.get('/admin/user-activity'),
         api.get('/admin/activity'),
       ]);
@@ -215,6 +223,7 @@ const AdminDashboard = () => {
       setStoreProducts(storeProductsRes.data.products);
       setStoreOrders(storeOrdersRes.data.orders);
       setPopupForm(popupRes.data.storePopup);
+      setPlatformForm(platformRes.data.platform);
       setUserActivity(userActivityRes.data.users || []);
       setActivity(activityRes.data.activity);
     } catch (error) {
@@ -505,6 +514,18 @@ const AdminDashboard = () => {
     try {
       const { data } = await api.patch('/admin/settings/store-popup', popupForm);
       setPopupForm(data.storePopup);
+      showToast(data.message, 'success');
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
+  };
+
+  const updatePlatformSettings = async (event) => {
+    event.preventDefault();
+    try {
+      const { data } = await api.patch('/admin/settings/platform', platformForm);
+      setPlatformForm(data.platform);
+      updatePlatformLocal(data.platform);
       showToast(data.message, 'success');
     } catch (error) {
       showToast(error.message, 'error');
@@ -1150,6 +1171,31 @@ const AdminDashboard = () => {
 
         {activeTab === 'settings' ? (
           <div className="admin-section-grid">
+            <form className="stack-form admin-form settings-form" onSubmit={updatePlatformSettings}>
+              <h3>إعدادات التحكم</h3>
+              <label className="switch-line">
+                <input
+                  type="checkbox"
+                  checked={platformForm.maintenanceMode}
+                  onChange={(event) => setPlatformForm({ ...platformForm, maintenanceMode: event.target.checked })}
+                />
+                <span>وضع الصيانة</span>
+              </label>
+              <p className="helper-text">عند التفعيل يتم قفل الموقع بالكامل للمستخدمين العاديين مع إبقاء دخول الأدمن متاحاً.</p>
+              <label className="switch-line">
+                <input
+                  type="checkbox"
+                  checked={platformForm.storeEnabled}
+                  onChange={(event) => setPlatformForm({ ...platformForm, storeEnabled: event.target.checked })}
+                />
+                <span>تفعيل المتجر</span>
+              </label>
+              <p className="helper-text">عند التعطيل تختفي روابط المتجر والسلة وتظهر رسالة أن المتجر غير متاح حالياً.</p>
+              <button className="primary-button" type="submit">
+                حفظ إعدادات المنصة
+              </button>
+            </form>
+
             <section className="stack-form admin-form settings-form">
               <h3>قيمة الكوينات بالدرهم</h3>
               <p className="helper-text">التحويل المعروض حاليا ثابت: 1000 كوين = 100 DH.</p>

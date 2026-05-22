@@ -23,7 +23,9 @@ const {
   listTaskSubmissions,
   reviewTaskSubmission,
   getCoinConversion,
+  getPlatformSettingsForAdmin,
   updateCoinConversion,
+  updatePlatformSettingsForAdmin,
   getStorePopupSettings,
   updateStorePopupSettings,
   listGameConfigs,
@@ -102,6 +104,8 @@ router.get('/settings/coin-rate', getCoinConversion);
 router.patch('/settings/coin-rate', updateCoinConversion);
 router.get('/settings/store-popup', getStorePopupSettings);
 router.patch('/settings/store-popup', updateStorePopupSettings);
+router.get('/settings/platform', getPlatformSettingsForAdmin);
+router.patch('/settings/platform', updatePlatformSettingsForAdmin);
 
 router.get('/game-configs', listGameConfigs);
 router.patch('/game-configs/:gameKey', updateGameConfig);

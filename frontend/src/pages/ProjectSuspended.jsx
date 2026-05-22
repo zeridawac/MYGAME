@@ -11,11 +11,13 @@ import {
   LockKeyhole,
   LogOut,
   MessageSquareText,
+  Mic,
   Play,
   RefreshCw,
   RotateCcw,
   SendHorizonal,
   ShieldCheck,
+  Square,
   Trash2,
   UploadCloud,
   Video,
@@ -32,6 +34,7 @@ const POLL_INTERVAL_MS = 1500;
 const DEFAULT_COIN_BALANCE = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+const MAX_AUDIO_SIZE = 25 * 1024 * 1024;
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const API_ORIGIN = API_URL.startsWith('http') ? API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '') : '';
 
@@ -109,12 +112,20 @@ const getMediaType = (mimeType = '', fallback = '') => {
     return 'image';
   }
 
+  if (mimeType.startsWith('audio/')) {
+    return 'audio';
+  }
+
   if (/\.(jpg|jpeg|png|webp)$/i.test(fallback)) {
     return 'image';
   }
 
   if (/\.(mp4|webm|mov)$/i.test(fallback)) {
     return 'video';
+  }
+
+  if (/\.(ogg|mp3|m4a|wav)$/i.test(fallback)) {
+    return 'audio';
   }
 
   return '';
@@ -299,7 +310,7 @@ const MessageBubble = ({ message, mode, onOpenMedia, onRewardMedia }) => {
 
       {mediaUrl ? (
         <>
-          {mode === 'admin' ? (
+          {mode === 'admin' && mediaType !== 'audio' ? (
             <div className="portal-media-actions">
               <button type="button" onClick={() => onOpenMedia(mediaPayload)}>
                 فتح
@@ -311,23 +322,36 @@ const MessageBubble = ({ message, mode, onOpenMedia, onRewardMedia }) => {
             </div>
           ) : null}
 
-          <button
-            className={`portal-media-thumb portal-media-thumb-${mediaType || 'image'}`}
-            type="button"
-            onClick={() => onOpenMedia(mediaPayload)}
-            aria-label="فتح الوسائط"
-          >
-            {mediaType === 'video' ? (
+          {mediaType === 'audio' ? (
+            <div className="portal-audio-bubble">
+              <div className="portal-audio-wave" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <audio src={mediaUrl} controls preload="metadata" />
+            </div>
+          ) : (
+            <button
+              className={`portal-media-thumb portal-media-thumb-${mediaType || 'image'}`}
+              type="button"
+              onClick={() => onOpenMedia(mediaPayload)}
+              aria-label="فتح الوسائط"
+            >
+              {mediaType === 'video' ? (
               <>
                 <video src={mediaUrl} preload="metadata" muted playsInline />
                 <span className="portal-play-badge">
                   <Play size={22} fill="currentColor" />
                 </span>
               </>
-            ) : (
-              <img src={mediaUrl} alt={mediaName} />
-            )}
-          </button>
+              ) : (
+                <img src={mediaUrl} alt={mediaName} />
+              )}
+            </button>
+          )}
         </>
       ) : null}
 
@@ -377,7 +401,21 @@ const MediaLightbox = ({ media, onClose }) => {
           <X size={22} />
         </button>
 
-        {media.type === 'video' ? (
+        {media.type === 'audio' ? (
+          <div className="portal-lightbox-audio">
+            <div className="portal-audio-wave large" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+            <strong>{media.name || 'رسالة صوتية'}</strong>
+            <audio src={media.url} controls autoPlay />
+          </div>
+        ) : media.type === 'video' ? (
           <video className="portal-lightbox-media" src={media.url} controls autoPlay playsInline />
         ) : (
           <img className="portal-lightbox-media" src={media.url} alt={media.name || 'صورة'} />
@@ -416,6 +454,12 @@ const ChatComposer = ({
   onSubmit,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
   const selectedMediaType = selectedMedia ? getMediaType(selectedMedia.type, selectedMedia.name) : '';
 
   const handlePick = (file) => {
@@ -423,18 +467,102 @@ const ChatComposer = ({
     setPickerOpen(false);
   };
 
+  const stopRecordingTracks = () => {
+    streamRef.current?.getTracks?.().forEach((track) => track.stop());
+    streamRef.current = null;
+  };
+
+  const stopRecordingTimer = () => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const startRecording = async () => {
+    if (disabled || recording) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      streamRef.current = stream;
+      recorderRef.current = recorder;
+      setRecordingSeconds(0);
+
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        stopRecordingTimer();
+        stopRecordingTracks();
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        chunksRef.current = [];
+        if (!blob.size) return;
+        if (blob.size > MAX_AUDIO_SIZE) {
+          onMediaChange(null);
+          return;
+        }
+        const extension = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';
+        const file = new File([blob], `voice-message-${Date.now()}.${extension}`, { type: blob.type || 'audio/webm' });
+        onMediaChange(file);
+      };
+
+      recorder.start();
+      setRecording(true);
+      timerRef.current = window.setInterval(() => setRecordingSeconds((current) => current + 1), 1000);
+    } catch {
+      onMediaChange(null);
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop();
+    }
+    recorderRef.current = null;
+    setRecording(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopRecordingTimer();
+      stopRecordingTracks();
+    };
+  }, []);
+
   return (
     <form className="portal-composer" onSubmit={onSubmit}>
       {mediaPreview ? (
         <div className="portal-media-preview">
-          {selectedMediaType === 'video' ? (
+          {selectedMediaType === 'audio' ? (
+            <div className="portal-audio-preview">
+              <div className="portal-audio-wave" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <audio src={mediaPreview} controls />
+            </div>
+          ) : selectedMediaType === 'video' ? (
             <video src={mediaPreview} muted playsInline preload="metadata" />
           ) : (
             <img src={mediaPreview} alt="معاينة الوسائط قبل الإرسال" />
           )}
           <div>
             <strong>{selectedMedia?.name || 'وسائط مرفقة'}</strong>
-            <span>{selectedMediaType === 'video' ? 'سيتم إرسال الفيديو داخل المحادثة' : 'سيتم إرسال الصورة داخل المحادثة'}</span>
+            <span>
+              {selectedMediaType === 'audio'
+                ? 'سيتم إرسال الرسالة الصوتية داخل المحادثة'
+                : selectedMediaType === 'video'
+                  ? 'سيتم إرسال الفيديو داخل المحادثة'
+                  : 'سيتم إرسال الصورة داخل المحادثة'}
+            </span>
           </div>
           <button type="button" onClick={onClearMedia} aria-label="إزالة الوسائط">
             <X size={16} />
@@ -472,6 +600,17 @@ const ChatComposer = ({
           ) : null}
         </div>
 
+        <button
+          className={`portal-attach-button portal-record-button ${recording ? 'is-recording' : ''}`}
+          type="button"
+          onClick={recording ? stopRecording : startRecording}
+          disabled={disabled || !navigator.mediaDevices?.getUserMedia}
+          aria-label={recording ? 'إيقاف التسجيل الصوتي' : 'تسجيل رسالة صوتية'}
+        >
+          {recording ? <Square size={18} fill="currentColor" /> : <Mic size={20} />}
+          {recording ? <span>{recordingSeconds}s</span> : null}
+        </button>
+
         <input
           type="text"
           value={value}
@@ -479,7 +618,7 @@ const ChatComposer = ({
           placeholder={placeholder}
           disabled={disabled}
         />
-        <button type="submit" disabled={disabled || (!value.trim() && !selectedMedia)} aria-label="إرسال">
+        <button type="submit" disabled={disabled || recording || (!value.trim() && !selectedMedia)} aria-label="إرسال">
           <SendHorizonal size={20} />
         </button>
       </div>
@@ -583,7 +722,7 @@ const UploadManager = ({ files, loading, error, onRefresh, onPreview, onDeleteFi
     <div className="portal-upload-list">
       {files.length ? (
         files.map((file) => {
-          const canPreview = file.type === 'image' || file.type === 'video';
+          const canPreview = file.type === 'image' || file.type === 'video' || file.type === 'audio';
           const fileUrl = getAssetUrl(file.url);
 
           return (
@@ -595,7 +734,9 @@ const UploadManager = ({ files, loading, error, onRefresh, onPreview, onDeleteFi
                 disabled={!canPreview}
                 aria-label={`فتح ${file.name}`}
               >
-                {file.type === 'video' ? (
+                {file.type === 'audio' ? (
+                  <Mic size={22} />
+                ) : file.type === 'video' ? (
                   <>
                     <video src={fileUrl} preload="metadata" muted playsInline />
                     <span className="portal-play-badge">
@@ -1008,7 +1149,7 @@ const ProjectSuspended = ({ openSupport = false, onEnterSite = () => {} }) => {
       const mediaType = getMediaType(file.type, file.name);
 
       if (!mediaType) {
-        setChatError('يمكن إرسال الصور أو الفيديو فقط.');
+        setChatError('يمكن إرسال الصور أو الفيديو أو الرسائل الصوتية فقط.');
         return;
       }
 
@@ -1019,6 +1160,11 @@ const ProjectSuspended = ({ openSupport = false, onEnterSite = () => {} }) => {
 
       if (mediaType === 'video' && file.size > MAX_VIDEO_SIZE) {
         setChatError('حجم الفيديو كبير جداً، الحد الأقصى هو 100MB.');
+        return;
+      }
+
+      if (mediaType === 'audio' && file.size > MAX_AUDIO_SIZE) {
+        setChatError('حجم الرسالة الصوتية كبير جداً، الحد الأقصى هو 25MB.');
         return;
       }
 

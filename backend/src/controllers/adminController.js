@@ -10,7 +10,7 @@ const TaskSubmission = require('../models/TaskSubmission');
 const GameConfig = require('../models/GameConfig');
 const ActivityLog = require('../models/ActivityLog');
 const { defaultGameConfigs } = require('../utils/defaultData');
-const { getCoinRate, getStorePopup, setCoinRate, setStorePopup } = require('../utils/settings');
+const { getCoinRate, getPlatformSettings, getStorePopup, setCoinRate, setPlatformSettings, setStorePopup } = require('../utils/settings');
 const { logActivity } = require('../utils/activity');
 
 const toNumberOrCurrent = (value, current, min = 0) => {
@@ -493,6 +493,22 @@ const updateStorePopupSettings = asyncHandler(async (req, res) => {
   });
 });
 
+const getPlatformSettingsForAdmin = asyncHandler(async (req, res) => {
+  const platform = await getPlatformSettings();
+
+  res.json({ success: true, platform });
+});
+
+const updatePlatformSettingsForAdmin = asyncHandler(async (req, res) => {
+  const setting = await setPlatformSettings(req.body);
+
+  res.json({
+    success: true,
+    message: 'تم تحديث إعدادات المنصة',
+    platform: setting.value,
+  });
+});
+
 const listGameConfigs = asyncHandler(async (req, res) => {
   await Promise.all(
     defaultGameConfigs.map((config) =>
@@ -576,6 +592,8 @@ module.exports = {
   updateCoinConversion,
   getStorePopupSettings,
   updateStorePopupSettings,
+  getPlatformSettingsForAdmin,
+  updatePlatformSettingsForAdmin,
   listGameConfigs,
   updateGameConfig,
   listActivity,

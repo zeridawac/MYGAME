@@ -12,6 +12,7 @@ const DEFAULT_COIN_BALANCE = 500;
 const MAX_MESSAGES = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+const MAX_AUDIO_SIZE = 25 * 1024 * 1024;
 const UPLOAD_PUBLIC_BASE = '/uploads/portal-chat';
 const UPLOAD_ROOT = path.join(process.cwd(), 'uploads', 'portal-chat');
 const MEDIA_TYPES = {
@@ -21,6 +22,12 @@ const MEDIA_TYPES = {
   'video/mp4': 'video',
   'video/webm': 'video',
   'video/quicktime': 'video',
+  'audio/webm': 'audio',
+  'audio/ogg': 'audio',
+  'audio/mpeg': 'audio',
+  'audio/mp4': 'audio',
+  'audio/wav': 'audio',
+  'audio/x-wav': 'audio',
 };
 
 const normalizeCode = (value) => String(value || '').trim().replace(/\s+/g, ' ');
@@ -80,6 +87,10 @@ const getMediaType = (mimeType = '', fallbackUrl = '') => {
 
   if (['.mp4', '.webm', '.mov'].includes(extension)) {
     return 'video';
+  }
+
+  if (['.ogg', '.mp3', '.m4a', '.wav'].includes(extension)) {
+    return 'audio';
   }
 
   return '';
@@ -249,6 +260,12 @@ const uploadPortalMedia = asyncHandler(async (req, res) => {
     await fs.unlink(req.file.path).catch(() => {});
     res.status(400);
     throw new Error('حجم الفيديو كبير جداً، الحد الأقصى هو 100MB.');
+  }
+
+  if (mediaType === 'audio' && req.file.size > MAX_AUDIO_SIZE) {
+    await fs.unlink(req.file.path).catch(() => {});
+    res.status(400);
+    throw new Error('حجم الرسالة الصوتية كبير جداً، الحد الأقصى هو 25MB.');
   }
 
   console.log('[portal-chat upload] stored file:', {

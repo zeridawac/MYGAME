@@ -44,8 +44,14 @@ const upload = multer({
       'video/mp4',
       'video/webm',
       'video/quicktime',
+      'audio/webm',
+      'audio/ogg',
+      'audio/mpeg',
+      'audio/mp4',
+      'audio/wav',
+      'audio/x-wav',
     ]);
-    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.mp4', '.webm', '.mov']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.mp4', '.webm', '.mov', '.ogg', '.mp3', '.m4a', '.wav']);
     const extension = path.extname(file.originalname || '').toLowerCase();
 
     if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(extension)) {
